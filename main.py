@@ -6,13 +6,40 @@ app = Flask(__name__)
 app.secret_key = "ezzo_super_secret_key_2026"
 DB_FILE = "database.db"
 
-# --- المتغيرات التي تحتوي على تصميماتك القديمة (ضع أكوادك هنا) ---
-# سأضع لك مثالاً بسيطاً، انسخ أنت أكواد الـ HTML الأصلية التي كانت عندك وضعها هنا:
-HOME_HTML = "<h1>مرحباً بك في سيرفر عزو الأسطوري</h1>"
-ADMIN_LOGIN_HTML = "<h2>دخول الإدارة</h2><form method='POST' action='/admin/login'><input name='username' placeholder='الاسم'><input type='password' name='password' placeholder='الباسوورد'><button>دخول</button></form>"
-ADMIN_DASHBOARD_HTML = "<h1>لوحة التحكم تعمل!</h1><a href='/admin/logout'>خروج</a>"
+# --- تصميماتك الأسطورية (النيون والشكل الحلو) ---
+HOME_HTML = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><style>
+body { background: linear-gradient(135deg, #0f0c1b, #201335); color: #ffffff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+h1 { font-size: 2.5rem; background: linear-gradient(45deg, #ff007f, #7f00ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 20px rgba(127, 0, 255, 0.5); }
+</style></head><body><h1>🎮 اللعبة تحت التطوير 🎮</h1></body></html>
+"""
 
-# --- 1. مسارات اللعبة (API) ---
+ADMIN_LOGIN_HTML = """
+<!DOCTYPE html><html lang="ar" dir="rtl"><head><style>
+body { background: #0f0c1b; color: white; display: flex; align-items: center; justify-content: center; height: 100vh; }
+.login-card { background: rgba(255, 255, 255, 0.03); padding: 40px; border-radius: 15px; border: 1px solid #ff007f; }
+input { width: 100%; padding: 10px; margin: 10px 0; background: #222; color: white; border: 1px solid #7f00ff; border-radius: 5px; }
+button { width: 100%; padding: 10px; background: linear-gradient(45deg, #7f00ff, #ff007f); border: none; color: white; cursor: pointer; }
+</style></head><body><div class="login-card"><h2>تسجيل دخول الإدارة 🔐</h2>
+<form method="POST" action="/admin/login">
+<input name="username" placeholder="اسم المستخدم" required>
+<input type="password" name="password" placeholder="كلمة المرور" required>
+<button type="submit">دخول</button></form></div></body></html>
+"""
+
+ADMIN_DASHBOARD_HTML = """
+<!DOCTYPE html><html lang="ar" dir="rtl"><head><style>
+body { background: #0b0813; color: #fff; padding: 20px; }
+h1 { color: #00f0ff; text-shadow: 0 0 10px #00f0ff; }
+.logout-btn { background: #ff3333; padding: 10px; color: white; text-decoration: none; border-radius: 8px; }
+</style></head><body>
+<h1>👑 لوحة تحكم الإمبراطور عزو 👑</h1>
+<a href="/admin/logout" class="logout-btn">تسجيل الخروج 🚪</a>
+</body></html>
+"""
+
+# --- 1. مسار اللعبة (API) ---
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
