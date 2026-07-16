@@ -1,57 +1,87 @@
-from flask import Flask, request, jsonify, redirect, session
+from flask import Flask, request, jsonify, redirect, session, render_template_string
 import sqlite3
 import os
 
 app = Flask(__name__)
-app.secret_key = "ezzo_super_secret_key"
+app.secret_key = "ezzo_secret_key_2026"
 DB_FILE = "database.db"
 
-# --- دالة عرض اللوحة بتنسيق النيون ---
-def get_admin_html(users):
-    html = """
-    <style>
-        body { background: #0d0d0d; color: #00ffcc; font-family: sans-serif; text-align: center; }
-        table { margin: 20px auto; width: 90%; border-collapse: collapse; box-shadow: 0 0 10px #00ffcc; }
-        th, td { padding: 15px; border: 1px solid #00ffcc; }
-        button { background: transparent; color: #ff00ff; border: 1px solid #ff00ff; cursor: pointer; padding: 5px; }
-        button:hover { background: #ff00ff; color: white; }
-    </style>
-    <h1>👑 لوحة تحكم الإمبراطور عزو 👑</h1>
-    <table>
-        <tr><th>اللاعب</th><th>البريد</th><th>الفلوس</th><th>الحالة</th><th>تحكم</th></tr>
-    """
-    for u in users:
-        status = "🟢 نشط" if not u[3] else "🔴 محظور"
-        html += f"""<tr>
-            <td>{u[0]}</td><td>{u[1]}</td><td>💰 {u[2]}</td><td>{status}</td>
-            <td>
-                <a href='/admin/action?act=ban&user={u[0]}'><button>حظر</button></a>
-                <a href='/admin/action?act=add&user={u[0]}'><button>+100</button></a>
-                <a href='/admin/action?act=del&user={u[0]}'><button>حذف</button></a>
-            </td>
-        </tr>"""
-    return html + "</table><a href='/admin/logout'>تسجيل الخروج</a>"
+# --- 1. قاعدة البيانات والتهيئة ---
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            email TEXT UNIQUE,
+            password TEXT,
+            money INTEGER DEFAULT 0,
+            is_banned INTEGER DEFAULT 0,
+            admin_message TEXT DEFAULT ''
+        )
+    """)
+    conn.commit()
+    conn.close()
 
+init_db()
+
+# --- 2. واجهات اللعبة (الرئيسية) ---
+@app.route('/')
+def home():
+    return "<h1>سيرفر اللعبة الإمبراطور عزو يعمل!</h1>"
+
+@app.route('/register', methods=['POST'])
+def game_register():
+    data = request.get_json()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        conn.execute("INSERT INTO users (username, email, password, money) VALUES (?, ?, ?, 500)", 
+                     (data['username'], data['email'], data['password']))
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "success"})
+    except:
+        return jsonify({"status": "error", "message": "موجود مسبقاً"}), 400
+
+@app.route('/login', methods=['POST'])
+def game_login():
+    data = request.get_json()
+    conn = sqlite3.connect(DB_FILE)
+    user = conn.execute("SELECT * FROM users WHERE email=? AND password=?", (data['email'], data['password'])).fetchone()
+    conn.close()
+    if user: return jsonify({"status": "success", "username": user[0]})
+    return jsonify({"status": "error"}), 400
+
+# --- 3. لوحة الأدمن (الكاملة) ---
 @app.route('/admin', methods=['GET', 'POST'])
 def admin_dashboard():
     if request.method == 'POST':
-        if request.form.get('password') == "12345": session['logged_in'] = True
-    if not session.get('logged_in'):
-        return "<body style='background:#0d0d0d; color:white;'><form method='POST'>كلمة السر: <input type='password' name='password'><button>دخول</button></form></body>"
+        if request.form.get('password') == "12345":
+            session['logged_in'] = True
     
+    if not session.get('logged_in'):
+        return "<form method='POST'>كلمة السر: <input type='password' name='password'><button>دخول</button></form>"
+
     conn = sqlite3.connect(DB_FILE)
-    users = conn.execute("SELECT username, email, money, is_banned FROM users").fetchall()
+    users = conn.execute("SELECT * FROM users").fetchall()
     conn.close()
-    return get_admin_html(users)
+    
+    html = "<style>body{background:#000; color:#0f0; font-family:monospace;}</style><h1>لوحة تحكم الإمبراطور عزو</h1><table border='1'><tr><th>اللاعب</th><th>الفلوس</th><th>الحالة</th><th>تحكم</th></tr>"
+    for u in users:
+        html += f"<tr><td>{u[0]}</td><td>{u[2]}</td><td>{'🔴 محظور' if u[4] else '🟢 نشط'}</td><td>"
+        html += f"<a href='/admin/action?act=ban&u={u[0]}'>[حظر]</a> "
+        html += f"<a href='/admin/action?act=money&u={u[0]}'>[+100]</a> "
+        html += f"<a href='/admin/action?act=del&u={u[0]}'>[حذف]</a></td></tr>"
+    return html + "</table><br><a href='/admin/logout'>تسجيل الخروج</a>"
 
 @app.route('/admin/action')
 def admin_action():
     if not session.get('logged_in'): return redirect('/admin')
-    act, user = request.args.get('act'), request.args.get('user')
+    act, user = request.args.get('act'), request.args.get('u')
     conn = sqlite3.connect(DB_FILE)
-    if act == 'ban': conn.execute("UPDATE users SET is_banned = 1 WHERE username = ?", (user,))
-    elif act == 'add': conn.execute("UPDATE users SET money = money + 100 WHERE username = ?", (user,))
-    elif act == 'del': conn.execute("DELETE FROM users WHERE username = ?", (user,))
+    if act == 'ban': conn.execute("UPDATE users SET is_banned=1 WHERE username=?", (user,))
+    elif act == 'money': conn.execute("UPDATE users SET money=money+100 WHERE username=?", (user,))
+    elif act == 'del': conn.execute("DELETE FROM users WHERE username=?", (user,))
     conn.commit()
     conn.close()
     return redirect('/admin')
