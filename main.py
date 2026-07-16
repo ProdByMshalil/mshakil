@@ -10,7 +10,6 @@ DB_FILE = "database.db"
 # 1. تصاميم HTML (واجهات الموقع)
 # ==========================================
 
-# الصفحة الأولية للعبة
 HOME_HTML = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -18,7 +17,7 @@ HOME_HTML = """
     <meta charset="UTF-8">
     <title>سيرفر اللعبة</title>
     <style>
-        body { background: radial-gradient(circle, #2a1b4d 0%, #0b0813 100%); color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+        body { background: radial-gradient(circle, #2a1b4d 0%, #0b0813 100%); color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
         .hero { background: rgba(0, 0, 0, 0.6); padding: 50px; border-radius: 20px; border: 2px solid #ff007f; box-shadow: 0 0 30px rgba(255, 0, 127, 0.5); }
         h1 { font-size: 3rem; margin-bottom: 10px; color: #00f0ff; text-shadow: 0 0 10px #00f0ff; }
         p { font-size: 1.5rem; color: #cccccc; margin-bottom: 30px; }
@@ -35,7 +34,6 @@ HOME_HTML = """
 </html>
 """
 
-# صفحة تسجيل دخول الإدارة
 ADMIN_LOGIN_HTML = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -60,7 +58,6 @@ ADMIN_LOGIN_HTML = """
 </html>
 """
 
-# لوحة تحكم الإدارة (المطابقة للصورة)
 ADMIN_DASHBOARD_HTML = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -68,7 +65,7 @@ ADMIN_DASHBOARD_HTML = """
     <meta charset="UTF-8">
     <title>لوحة تحكم الإمبراطور</title>
     <style>
-        body { background-color: #0d0a14; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; }
+        body { background-color: #0d0a14; color: white; font-family: sans-serif; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #ff007f; padding-bottom: 10px; }
         .header h1 { color: #ff007f; margin: 0; font-size: 2.2rem; text-shadow: 0 0 10px rgba(255,0,127,0.5); }
         .logout-btn { background-color: #ff3333; color: white; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; }
@@ -81,11 +78,11 @@ ADMIN_DASHBOARD_HTML = """
         .banned { color: #ff3333; font-weight: bold; background: rgba(255,51,51,0.1); padding: 5px 10px; border-radius: 50px; }
         .active { color: #28a745; font-weight: bold; background: rgba(40,167,69,0.1); padding: 5px 10px; border-radius: 50px; }
         .money { color: #ffd700; font-weight: bold; font-size: 1.1rem; }
-        .password-box { background: #000; padding: 5px 10px; border-radius: 5px; color: #ff007f; font-family: monospace; letter-spacing: 1px; }
+        .password-box { background: #000; padding: 5px 10px; border-radius: 5px; color: #ff007f; font-family: monospace; }
         
         .actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
         .input-sm { padding: 8px; background: #0d0a14; border: 1px solid #3d2366; color: white; border-radius: 5px; width: 100px; text-align: center; outline: none; }
-        .btn { padding: 8px 15px; border: none; border-radius: 5px; color: white; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn { padding: 8px 15px; border: none; border-radius: 5px; color: white; font-weight: bold; cursor: pointer; text-decoration: none; }
         
         .btn-add { background-color: #8a2be2; }
         .btn-sub { background-color: #dc143c; }
@@ -137,34 +134,30 @@ ADMIN_DASHBOARD_HTML = """
                         <span class="active">نشط 🟢</span>
                     {% endif %}
                 </td>
-                <td style="color: #ccc; font-size: 0.9rem;">{{ user.admin_message or 'لا توجد رسالة' }}</td>
+                <td style="color: #ccc;">{{ user.admin_message or 'لا توجد رسالة' }}</td>
                 <td>
                     <div class="actions">
-                        <!-- التحكم في الفلوس -->
                         <form method="POST" action="/admin/action/{{ user.username }}" class="action-group" style="display: flex; gap: 5px;">
                             <input type="number" name="amount" class="input-sm" placeholder="المبلغ" required>
                             <button type="submit" name="action_type" value="add_money" class="btn btn-add">زيادة ➕</button>
                             <button type="submit" name="action_type" value="sub_money" class="btn btn-sub">خصم ➖</button>
                         </form>
                         
-                        <!-- إرسال رسالة -->
                         <form method="POST" action="/admin/action/{{ user.username }}" class="action-group" style="display: flex; gap: 5px;">
                             <input type="text" name="message" class="input-sm" style="width: 150px;" placeholder="اكتب رسالة..." required>
                             <button type="submit" name="action_type" value="send_msg" class="btn btn-send">إرسال 💬</button>
                         </form>
                         
-                        <!-- الحظر وفك الحظر -->
                         <form method="POST" action="/admin/action/{{ user.username }}" class="action-group">
                             {% if user.is_banned == 1 %}
                                 <button type="submit" name="action_type" value="unban" class="btn btn-unban">فك الحظر ✅</button>
                             {% else %}
-                                <button type="submit" name="action_type" value="ban" class="btn btn-ban">حظر اللاعب 🚫</button>
+                                <button type="submit" name="action_type" value="ban" class="btn btn-ban">حظر 🚫</button>
                             {% endif %}
                         </form>
                     </div>
                     
-                    <!-- زر الحذف النهائي مع رسالة تحذيرية -->
-                    <form method="POST" action="/admin/action/{{ user.username }}" onsubmit="return confirm('⚠️ تحذير خطير: هل أنت متأكد من مسح حساب ({{ user.username }}) نهائياً؟ لا يمكن التراجع عن هذه الخطوة!');">
+                    <form method="POST" action="/admin/action/{{ user.username }}" onsubmit="return confirm('⚠️ هل أنت متأكد من حذف حساب ({{ user.username }}) نهائياً؟');">
                         <button type="submit" name="action_type" value="delete" class="btn btn-delete">حذف الحساب نهائياً 🗑️</button>
                     </form>
                 </td>
@@ -177,13 +170,14 @@ ADMIN_DASHBOARD_HTML = """
 """
 
 # ==========================================
-# 2. دوال اللعبة وقاعدة البيانات (API)
+# 2. مسارات اللعبة (API)
 # ==========================================
 
 @app.route('/')
 def home():
     return render_template_string(HOME_HTML)
 
+# دالة تسجيل الدخول (Login)
 @app.route('/login', methods=['POST'])
 def game_login():
     data = request.json
@@ -192,14 +186,9 @@ def game_login():
     
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    # تأكد من أن قاعدة بياناتك تحتوي على هذه الأعمدة
-    try:
-        cursor.execute("SELECT username, password, money, is_banned, admin_message FROM users WHERE email = ?", (email,))
-        row = cursor.fetchone()
-    except sqlite3.OperationalError:
-        return jsonify({"status": "error", "message": "خطأ في قاعدة البيانات، تأكد من الأعمدة"}), 500
-    finally:
-        conn.close()
+    cursor.execute("SELECT username, password, money, is_banned, admin_message FROM users WHERE email = ?", (email,))
+    row = cursor.fetchone()
+    conn.close()
         
     if row and row[1] == password:
         if row[3] == 1: 
@@ -208,85 +197,15 @@ def game_login():
         
     return jsonify({"status": "error", "message": "البريد الإلكتروني أو كلمة المرور غير صحيحة"}), 400
 
-# ==========================================
-# 3. دوال لوحة التحكم (Admin)
-# ==========================================
-
-@app.route('/admin')
-def admin_dashboard():
-    if not session.get('logged_in'):
-        return render_template_string(ADMIN_LOGIN_HTML)
+# دالة إنشاء حساب جديد (Register) - جديدة 🌟
+@app.route('/register', methods=['POST'])
+def game_register():
+    data = request.json
+    if not data or 'username' not in data or 'email' not in data or 'password' not in data:
+        return jsonify({"status": "error", "message": "بيانات غير مكتملة"}), 400
         
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row  # هذه تجعل البيانات تظهر كأسماء أعمدة للـ HTML
-    cursor = conn.cursor()
+    username = data.get('username').strip()
+    email = data.get('email').strip()
+    password = data.get('password').strip()
     
-    # جلب جميع اللاعبين لعرضهم في اللوحة
-    try:
-        cursor.execute("SELECT username, email, password, money, is_banned, admin_message FROM users")
-        users = cursor.fetchall()
-    except sqlite3.OperationalError:
-        users = []
-        flash("تنبيه: لا يوجد جدول users أو الأعمدة غير متطابقة.")
-    finally:
-        conn.close()
-        
-    return render_template_string(ADMIN_DASHBOARD_HTML, users=users)
-
-@app.route('/admin/login', methods=['POST'])
-def admin_login():
-    if request.form.get('username') == "admin" and request.form.get('password') == "12345":
-        session['logged_in'] = True
-        return redirect('/admin')
-    return "<h2 style='color:red; text-align:center;'>بيانات الدخول خاطئة!</h2>"
-
-@app.route('/admin/logout')
-def admin_logout():
-    session.pop('logged_in', None)
-    return redirect('/admin')
-
-# دالة مجمعة للتعامل مع كل أزرار لوحة التحكم
-@app.route('/admin/action/<username>', methods=['POST'])
-def admin_action(username):
-    if not session.get('logged_in'):
-        return redirect('/admin')
-        
-    action_type = request.form.get('action_type')
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-
-    if action_type == 'add_money':
-        amount = int(request.form.get('amount', 0))
-        cursor.execute("UPDATE users SET money = money + ? WHERE username = ?", (amount, username))
-        flash(f"تمت إضافة ${amount} للاعب {username} بنجاح!")
-        
-    elif action_type == 'sub_money':
-        amount = int(request.form.get('amount', 0))
-        # استخدام عملية الطرح لخصم الفلوس
-        cursor.execute("UPDATE users SET money = money - ? WHERE username = ?", (amount, username))
-        flash(f"تم خصم ${amount} من اللاعب {username}!")
-        
-    elif action_type == 'send_msg':
-        msg = request.form.get('message', '')
-        cursor.execute("UPDATE users SET admin_message = ? WHERE username = ?", (msg, username))
-        flash(f"تم إرسال الرسالة إلى {username} بنجاح!")
-        
-    elif action_type == 'ban':
-        cursor.execute("UPDATE users SET is_banned = 1 WHERE username = ?", (username,))
-        flash(f"تم حظر {username}!")
-        
-    elif action_type == 'unban':
-        cursor.execute("UPDATE users SET is_banned = 0 WHERE username = ?", (username,))
-        flash(f"تم فك الحظر عن {username}!")
-        
-    elif action_type == 'delete':
-        cursor.execute("DELETE FROM users WHERE username = ?", (username,))
-        flash(f"تم مسح حساب {username} نهائياً من قاعدة البيانات!")
-
-    conn.commit()
-    conn.close()
-    return redirect('/admin')
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    if not username or not email
