@@ -5,18 +5,24 @@ import os
 app = Flask(__name__)
 DB_FILE = "database.db"
 
-# دالة الدخول التي تبحث بالإيميل
+# المسار الرئيسي (اختياري)
+@app.route('/')
+def home():
+    return "السيرفر يعمل الآن!"
+
+# مسار تسجيل الدخول - هذا هو الأهم
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
     if not data or 'email' not in data or 'password' not in data:
-        return jsonify({"status": "error", "message": "بيانات غير مكتملة"}), 400
+        return jsonify({"status": "error", "message": "بيانات ناقصة"}), 400
         
     email = data.get('email')
     password = data.get('password')
 
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
+    # تأكد أن عمود البريد اسمه 'email' في قاعدة بياناتك
     cursor.execute("SELECT username, password FROM users WHERE email = ?", (email,))
     row = cursor.fetchone()
     conn.close()
@@ -27,4 +33,4 @@ def login():
         return jsonify({"status": "error", "message": "بيانات الدخول خاطئة"}), 400
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host='0.0.0.0', port=5000)
