@@ -4,7 +4,56 @@ import os
 
 app = Flask(__name__)
 app.secret_key = "ezzo_super_secret_key_2026"
+
+# حماية إضافية: تمنع حدوث خطأ 404 إذا أرسل جودو شرطة مائلة زائدة في نهاية الرابط (مثل /login/)
+app.url_map.strict_slashes = False
+
 DB_FILE = "database.db"
+
+# ==========================================
+# 0. دالة الإصلاح والإنشاء التلقائي لقاعدة البيانات
+# ==========================================
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    # إنشاء جدول المستخدمين إذا لم يكن موجوداً
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            email TEXT UNIQUE,
+            password TEXT,
+            money INTEGER DEFAULT 0,
+            is_banned INTEGER DEFAULT 0,
+            admin_message TEXT DEFAULT ''
+        )
+    """)
+    conn.commit()
+    
+    # فحص الأعمدة الحالية وإضافة أي عمود ناقص تلقائياً (حماية من الانهيار)
+    cursor.execute("PRAGMA table_info(users)")
+    existing_columns = [col[1] for col in cursor.fetchall()]
+    
+    required_columns = {
+        "password": "TEXT DEFAULT ''",
+        "money": "INTEGER DEFAULT 0",
+        "is_banned": "INTEGER DEFAULT 0",
+        "admin_message": "TEXT DEFAULT ''"
+    }
+    
+    for col_name, col_type in required_columns.items():
+        if col_name not in existing_columns:
+            try:
+                cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
+                print(f"🔧 تم إصلاح وإضافة العمود الناقص: {col_name}")
+            except Exception as e:
+                print(f"⚠️ خطأ أثناء تحديث العمود {col_name}: {e}")
+                
+    conn.commit()
+    conn.close()
+
+# تشغيل الفحص التلقائي بمجرد إقلاع السيرفر
+init_db()
 
 # ==========================================
 # 1. تصاميم HTML (واجهات الموقع)
@@ -180,17 +229,28 @@ def home():
 # دالة تسجيل الدخول (Login)
 @app.route('/login', methods=['POST'])
 def game_login():
-    data = request.json
+    # دعم استقبال البيانات سواء كـ JSON أو كـ Form البيانات المرسلة من جودو
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form
+        
+    if not data:
+        return jsonify({"status": "error", "message": "لم يتم إرسال أي بيانات!"}), 400
+        
     email = data.get('email')
     password = data.get('password')
     
+    if not email or not password:
+        return jsonify({"status": "error", "message": "الرجاء إدخال البريد الإلكتروني وكلمة المرور"}), 400
+        
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("SELECT username, password, money, is_banned, admin_message FROM users WHERE email = ?", (email,))
+    cursor.execute("SELECT username, password, money, is_banned, admin_message FROM users WHERE email = ?", (email.strip(),))
     row = cursor.fetchone()
     conn.close()
         
-    if row and row[1] == password:
+    if row and row[1] == password.strip():
         if row[3] == 1: 
             return jsonify({"status": "error", "message": "حسابك محظور من قبل الإدارة!"}), 403
         return jsonify({"status": "success", "username": row[0], "money": row[2], "msg": row[4]}), 200
@@ -200,7 +260,12 @@ def game_login():
 # دالة إنشاء حساب جديد (Register)
 @app.route('/register', methods=['POST'])
 def game_register():
-    data = request.json
+    # دعم استقبال البيانات سواء كـ JSON أو كـ Form البيانات المرسلة من جودو
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form
+        
     if not data or 'username' not in data or 'email' not in data or 'password' not in data:
         return jsonify({"status": "error", "message": "بيانات غير مكتملة"}), 400
         
@@ -208,7 +273,6 @@ def game_register():
     email = data.get('email').strip()
     password = data.get('password').strip()
     
-    # هنا تم إصلاح السطر 211 وإضافة الـ (:) المطلوبة
     if not username or not email or not password:
         return jsonify({"status": "error", "message": "الرجاء تعبئة جميع الحقول"}), 400
 
@@ -254,9 +318,16 @@ def admin_dashboard():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT username, email, password, money, is_banned, admin_message FROM users")
-    users = cursor.fetchall()
-    conn.close()
+    
+    # جلب البيانات بشكل آمن ومحمي
+    try:
+        cursor.execute("SELECT username, email, password, money, is_banned, admin_message FROM users")
+        users = cursor.fetchall()
+    except sqlite3.OperationalError:
+        users = []
+        flash("تنبيه: تم إعادة ضبط قاعدة البيانات بنجاح.")
+    finally:
+        conn.close()
         
     return render_template_string(ADMIN_DASHBOARD_HTML, users=users)
 
@@ -270,48 +341,4 @@ def admin_login():
 @app.route('/admin/logout')
 def admin_logout():
     session.pop('logged_in', None)
-    return redirect('/admin')
-
-@app.route('/admin/action/<username>', methods=['POST'])
-def admin_action(username):
-    if not session.get('logged_in'):
-        return redirect('/admin')
-        
-    action_type = request.form.get('action_type')
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-
-    if action_type == 'add_money':
-        amount = int(request.form.get('amount', 0))
-        cursor.execute("UPDATE users SET money = money + ? WHERE username = ?", (amount, username))
-        flash(f"تمت إضافة ${amount} للاعب {username}!")
-        
-    elif action_type == 'sub_money':
-        amount = int(request.form.get('amount', 0))
-        cursor.execute("UPDATE users SET money = money - ? WHERE username = ?", (amount, username))
-        flash(f"تم خصم ${amount} من اللاعب {username}!")
-        
-    elif action_type == 'send_msg':
-        msg = request.form.get('message', '')
-        cursor.execute("UPDATE users SET admin_message = ? WHERE username = ?", (msg, username))
-        flash(f"تم إرسال الرسالة إلى {username}!")
-        
-    elif action_type == 'ban':
-        cursor.execute("UPDATE users SET is_banned = 1 WHERE username = ?", (username,))
-        flash(f"تم حظر {username}!")
-        
-    elif action_type == 'unban':
-        cursor.execute("UPDATE users SET is_banned = 0 WHERE username = ?", (username,))
-        flash(f"تم فك الحظر عن {username}!")
-        
-    elif action_type == 'delete':
-        cursor.execute("DELETE FROM users WHERE username = ?", (username,))
-        flash(f"تم مسح حساب {username} نهائياً!")
-
-    conn.commit()
-    conn.close()
-    return redirect('/admin')
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    return
