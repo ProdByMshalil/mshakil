@@ -1,11 +1,9 @@
 from flask import Flask, request, jsonify
 import sqlite3
-import os
 
 app = Flask(__name__)
 DB_NAME = "database.db"
 
-# دالة لإنشاء قاعدة البيانات وجدول اللاعبين تلقائياً إذا لم يكن موجوداً
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -17,22 +15,68 @@ def init_db():
             admin_message TEXT DEFAULT ''
         )
     ''')
-    # إضافة لاعب تجريبي "ghgh" إذا كانت قاعدة البيانات جديدة تماماً
     cursor.execute('''
         INSERT OR IGNORE INTO players (username, money, is_banned, admin_message)
-        VALUES ('ghgh', 7500, 0, 'مرحباً بك يا عزو! السيرفر متصل الآن بنجاح 🚀')
+        VALUES ('ghgh', 600, 0, '')
     ''')
     conn.commit()
     conn.close()
 
-# تشغيل إنشاء قاعدة البيانات فوراً عند إقلاع السيرفر
 init_db()
 
+# الثيم القديم البسيط للرئيسية
 @app.route('/')
 def home():
-    return "السيرفر يعمل بكفاءة عالية مع قاعدة بيانات SQLite دائمية!"
+    return "السيرفر يعمل بنجاح وجاهز لاستقبال طلبات لعبة جودوت!"
 
-# 🌐 المسار الخاص بجودوت لجلب حالة اللاعب ومزامنتها
+# دالة لوحة التحكم (Admin Panel) القديمة حقتك للتحكم في الحظر والبيانات
+@app.route('/admin', methods=['GET', 'POST'])
+def admin_panel():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    
+    if request.method == 'POST':
+        # استقبال البيانات من الفورم حقك
+        username = request.form.get('username')
+        money = request.form.get('money')
+        is_banned = request.form.get('is_banned')
+        admin_msg = request.form.get('admin_message')
+        
+        cursor.execute('''
+            INSERT INTO players (username, money, is_banned, admin_message)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(username) DO UPDATE SET
+                money=excluded.money,
+                is_banned=excluded.is_banned,
+                admin_message=excluded.admin_message
+        ''', (username, money, is_banned, admin_msg))
+        conn.commit()
+    
+    # جلب كل اللاعبين لعرضهم في اللوحة القديمة
+    cursor.execute('SELECT * FROM players')
+    players = cursor.fetchall()
+    conn.close()
+    
+    # الثيم القديم للوحة التحكم HTML اللي يخليك تتحكم في الكل
+    html = '''
+    <h1>لوحة تحكم المسؤولين - Admin Panel</h1>
+    <form method="POST">
+        تعديل لاعب: <input type="text" name="username" placeholder="اسم اللاعب" required><br><br>
+        الفلوس: <input type="number" name="money" value="600"><br><br>
+        الحظر (0 أو 1): <input type="number" name="is_banned" value="0" min="0" max="1"><br><br>
+        رسالة الإدارة: <input type="text" name="admin_message"><br><br>
+        <input type="submit" value="تحديث البيانات">
+    </form>
+    <h2>قائمة اللاعبين الحالية:</h2>
+    <table border="1">
+        <tr><th>الاسم</th><th>الفلوس</th><th>محظور؟</th><th>الرسالة</th></tr>
+    '''
+    for p in players:
+        html += f"<tr><td>{p[0]}</td><td>{p[1]}</td><td>{p[2]}</td><td>{p[3]}</td></tr>"
+    html += "</table>"
+    return html
+
+# المسار الخاص بجودوت لطلب البيانات
 @app.route('/get_player_status', methods=['GET'])
 def get_player_status():
     username = request.args.get('username')
@@ -53,44 +97,14 @@ def get_player_status():
             "admin_message": admin_message
         })
     else:
-        # إذا اللاعب جديد، نسجله في قاعدة البيانات بالقيم الافتراضية فوراً
         cursor.execute('INSERT INTO players (username, money, is_banned, admin_message) VALUES (?, 600, 0, "")', (username,))
         conn.commit()
         conn.close()
         return jsonify({
             "money": 600,
             "is_banned": 0,
-            "admin_message": "تم تسجيل لاعب جديد تلقائياً"
+            "admin_message": ""
         })
-
-# 🛠️ مسارات إضافية تتيح لك التحكم باللاعب (تغيير فلوسه أو حظره) عبر المتصفح مباشرة!
-@app.route('/admin/set_money', methods=['GET'])
-def set_money():
-    username = request.args.get('username')
-    amount = request.args.get('amount', type=int)
-    if not username or amount is None:
-        return "خطأ: يجب تحديد اسم اللاعب والمبلغ", 400
-        
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute('UPDATE players SET money = ? WHERE username = ?', (amount, username))
-    conn.commit()
-    conn.close()
-    return f"تم تعديل فلوس اللاعب {username} إلى {amount} بنجاح!"
-
-@app.route('/admin/ban', methods=['GET'])
-def ban_player():
-    username = request.args.get('username')
-    status = request.args.get('status', type=int, default=1) # 1 للحظر، 0 لإلغاء الحظر
-    if not username:
-        return "خطأ: يجب تحديد اسم اللاعب", 400
-        
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute('UPDATE players SET is_banned = ? WHERE username = ?', (status, username))
-    conn.commit()
-    conn.close()
-    return f"تم تغيير حالة حظر اللاعب {username} إلى {status}!"
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
