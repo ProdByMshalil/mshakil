@@ -10,17 +10,22 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS players (
             username TEXT PRIMARY KEY,
-            email TEXT DEFAULT '888',
+            password TEXT DEFAULT '',
+            email TEXT DEFAULT '',
             money INTEGER DEFAULT 600,
             is_banned INTEGER DEFAULT 0,
             admin_message TEXT DEFAULT ''
         )
     ''')
-    # إضافة اللاعب التجريبي ghgh بنفس بيانات صورتك إذا لم يكن موجوداً
-    cursor.execute('''
-        INSERT OR IGNORE INTO players (username, email, money, is_banned, admin_message)
-        VALUES ('ghgh', '888', 500, 0, 'لا يوجد')
-    ''')
+    
+    # تحديث الأعمدة لو كانت قاعدة البيانات قديمة
+    cursor.execute("PRAGMA table_info(players)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if 'password' not in columns:
+        cursor.execute("ALTER TABLE players ADD COLUMN password TEXT DEFAULT ''")
+    if 'email' not in columns:
+        cursor.execute("ALTER TABLE players ADD COLUMN email TEXT DEFAULT ''")
+
     conn.commit()
     conn.close()
 
@@ -30,7 +35,7 @@ init_db()
 def home():
     return "السيرفر يعمل بنجاح وجاهز لاستقبال طلبات لعبة جودوت!"
 
-# 👑 لوحة تحكم الإمبراطور عزو بالثيم البنفسجي والأزرار السريعة
+# 👑 لوحة تحكم الإمبراطور عزو (الشكل الأصلي الثابت)
 @app.route('/admin', methods=['GET'])
 def admin_panel():
     conn = sqlite3.connect(DB_NAME)
@@ -39,7 +44,6 @@ def admin_panel():
     players = cursor.fetchall()
     conn.close()
 
-    # تصميم الـ CSS المطابق تماماً لصورتك (خلفية سوداء، إطار بنفسجي مضيء، نيون)
     html = '''
     <!DOCTYPE html>
     <html lang="ar" dir="rtl">
@@ -91,8 +95,6 @@ def admin_panel():
             .status-active { color: #00ff00; font-weight: bold; }
             .status-banned { color: #ff0055; font-weight: bold; }
             .msg-text { color: #ff00ff; }
-            
-            /* أشكال عناصر التحكم الداعمة داخل الجدول */
             .control-box {
                 display: flex;
                 flex-wrap: wrap;
@@ -127,7 +129,6 @@ def admin_panel():
             .btn-plus { background-color: #00cccc; }
             .btn-msg { background-color: #007bff; }
             .btn-del { background-color: #555; }
-            
             .logout-btn {
                 display: inline-block;
                 margin-top: 25px;
@@ -138,9 +139,7 @@ def admin_panel():
         </style>
     </head>
     <body>
-
         <h1>👑 لوحة تحكم الإمبراطور عزو 👑</h1>
-
         <div class="panel-container">
             <table>
                 <thead>
@@ -176,7 +175,7 @@ def admin_panel():
                                 <form action="/quick_action" method="GET" style="display:inline; margin:0;">
                                     <input type="hidden" name="action" value="update_money">
                                     <input type="hidden" name="username" value="{username}">
-                                    <input type="number" name="amount" class="input-val" placeholder="المبلغ أو الرسالة" required>
+                                    <input type="number" name="amount" class="input-val" placeholder="المبلغ" required>
                                     <button type="submit" name="sub_action" value="plus" class="btn btn-plus">+ زيادة</button>
                                     <button type="submit" name="sub_action" value="minus" class="btn btn-minus">- نقصان</button>
                                 </form>
@@ -184,8 +183,8 @@ def admin_panel():
                                 <form action="/quick_action" method="GET" style="display:inline; margin:0;">
                                     <input type="hidden" name="action" value="send_message">
                                     <input type="hidden" name="username" value="{username}">
-                                    <input type="text" name="message" class="input-val" placeholder="اكتب الرسالة هنا" required>
-                                    <button type="submit" class="btn btn-msg">📧 إرسال رسالة</button>
+                                    <input type="text" name="message" class="input-val" placeholder="اكتب الرسالة" required>
+                                    <button type="submit" class="btn btn-msg">📧 إرسال</button>
                                 </form>
 
                                 <button class="btn btn-del" onclick="if(confirm('هل أنت متأكد؟')) location.href='/quick_action?action=delete&username={username}'">❌ حذف</button>
@@ -198,15 +197,13 @@ def admin_panel():
                 </tbody>
             </table>
         </div>
-
         <a href="#" class="logout-btn">🚪 تسجيل الخروج</a>
-
     </body>
     </html>
     '''
     return html
 
-# 🛠️ معالج العمليات السريعة بضغطة زر واحدة بدون تعقيد
+# 🛠️ التحكم السريع
 @app.route('/quick_action', methods=['GET'])
 def quick_action():
     action = request.args.get('action')
@@ -220,7 +217,6 @@ def quick_action():
     
     if action == 'toggle_ban':
         cursor.execute('UPDATE players SET is_banned = 1 - is_banned WHERE username = ?', (username,))
-        
     elif action == 'update_money':
         amount = request.args.get('amount', type=int, default=0)
         sub_action = request.args.get('sub_action')
@@ -228,11 +224,9 @@ def quick_action():
             cursor.execute('UPDATE players SET money = money + ? WHERE username = ?', (amount, username))
         elif sub_action == 'minus':
             cursor.execute('UPDATE players SET money = money - ? WHERE username = ?', (amount, username))
-            
     elif action == 'send_message':
         msg = request.args.get('message', default='')
         cursor.execute('UPDATE players SET admin_message = ? WHERE username = ?', (msg, username))
-        
     elif action == 'delete':
         cursor.execute('DELETE FROM players WHERE username = ?', (username,))
         
@@ -240,7 +234,80 @@ def quick_action():
     conn.close()
     return redirect(url_for('admin_panel'))
 
-# 🌐 المسار الخاص بجودوت لجلب حالة اللاعب ومزامنتها
+# 🌐 1. مسار تسجيل الدخول (/login) - حل المشكلة الموضحة في صورتك
+@app.route('/login', methods=['POST', 'GET'])
+def login():
+    data = request.get_json(silent=True) or request.form or request.args
+    login_id = str(data.get('email') or data.get('username') or '').strip()
+    password = str(data.get('password', '')).strip()
+
+    if not login_id:
+        return jsonify({"status": "error", "message": "البريد الإلكتروني أو اسم المستخدم مفقود"}), 400
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    # فحص الحساب بالبريد أو اسم المستخدم ومطابقة كلمة المرور
+    cursor.execute('''
+        SELECT username, email, money, is_banned, admin_message 
+        FROM players 
+        WHERE (email = ? OR username = ?) AND password = ?
+    ''', (login_id, login_id, password))
+    
+    player = cursor.fetchone()
+    conn.close()
+
+    if player:
+        username, email, money, is_banned, admin_message = player
+        if is_banned == 1:
+            return jsonify({"status": "error", "message": "هذا الحساب محظور من الإدارة!"})
+
+        return jsonify({
+            "status": "success",
+            "message": "تم تسجيل الدخول بنجاح!",
+            "username": username,
+            "email": email,
+            "money": money,
+            "admin_message": admin_message
+        })
+    else:
+        return jsonify({"status": "error", "message": "بيانات الدخول غير صحيحة!"})
+
+# 🌐 2. مسار إنشــاء حساب جديد (/register) - حفظ البريد الفعلي بدل 888
+@app.route('/register', methods=['POST', 'GET'])
+def register():
+    data = request.get_json(silent=True) or request.form or request.args
+    email = str(data.get('email', '')).strip()
+    username = str(data.get('username', '')).strip()
+    password = str(data.get('password', '')).strip()
+
+    # إذا أرسل جودوت البريد فقط استخدمه كاسم مستخدم والعكس
+    if not username and email:
+        username = email
+    if not email and username:
+        email = username
+
+    if not username:
+        return jsonify({"status": "error", "message": "بيانات الحساب غير كاملة"}), 400
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT username FROM players WHERE username = ? OR (email != "" AND email = ?)', (username, email))
+    if cursor.fetchone():
+        conn.close()
+        return jsonify({"status": "error", "message": "الحساب أو البريد مستخدم مسبقاً!"})
+
+    cursor.execute('''
+        INSERT INTO players (username, password, email, money, is_banned, admin_message)
+        VALUES (?, ?, ?, 600, 0, 'لا يوجد')
+    ''', (username, password, email))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"status": "success", "message": "تم إنشاء الحساب بنجاح!"})
+
+# 🌐 3. مسار جلب حالة اللاعب داخل اللعبة
 @app.route('/get_player_status', methods=['GET'])
 def get_player_status():
     username = request.args.get('username')
@@ -251,52 +318,17 @@ def get_player_status():
     cursor = conn.cursor()
     cursor.execute('SELECT money, is_banned, admin_message FROM players WHERE username = ?', (username,))
     row = cursor.fetchone()
-    
+    conn.close()
+
     if row:
         money, is_banned, admin_message = row
-        conn.close()
         return jsonify({
             "money": money,
             "is_banned": is_banned,
             "admin_message": admin_message
         })
     else:
-        cursor.execute('INSERT INTO players (username, money, is_banned, admin_message) VALUES (?, 600, 0, "لا يوجد")', (username,))
-        conn.commit()
-        conn.close()
-        return jsonify({
-            "money": 600,
-            "is_banned": 0,
-            "admin_message": "لا يوجد"
-        })
-
-# 🆕 مسار التسجيل الجديد لحل مشكلة الـ 404 في جودوت
-@app.route('/register', methods=['POST', 'GET'])
-def register():
-    data = request.get_json(silent=True) or request.form
-    username = data.get('username')
-    
-    if not username:
-        return jsonify({"status": "error", "message": "اسم المستخدم مفقود"}), 400
-        
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT username FROM players WHERE username = ?', (username,))
-    existing = cursor.fetchone()
-    
-    if existing:
-        conn.close()
-        return jsonify({"status": "error", "message": "اسم المستخدم مستخدم مسبقاً"})
-    
-    cursor.execute('''
-        INSERT INTO players (username, money, is_banned, admin_message)
-        VALUES (?, 600, 0, 'لا يوجد')
-    ''', (username,))
-    conn.commit()
-    conn.close()
-    
-    return jsonify({"status": "success", "message": "تم إنشاء الحساب بنجاح!"})
+        return jsonify({"error": "اللاعب غير موجود"}), 404
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
