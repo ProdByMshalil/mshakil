@@ -206,7 +206,7 @@ def admin_panel():
     '''
     return html
 
-# 🛠️ معالج العمليات السريعة بضغطة زر واحدة بدون تعقيد وفورم منفصل
+# 🛠️ معالج العمليات السريعة بضغطة زر واحدة بدون تعقيد
 @app.route('/quick_action', methods=['GET'])
 def quick_action():
     action = request.args.get('action')
@@ -219,7 +219,6 @@ def quick_action():
     cursor = conn.cursor()
     
     if action == 'toggle_ban':
-        # عكس حالة الحظر الحالية (لو 0 تروح 1، ولو 1 تروح 0)
         cursor.execute('UPDATE players SET is_banned = 1 - is_banned WHERE username = ?', (username,))
         
     elif action == 'update_money':
@@ -241,7 +240,7 @@ def quick_action():
     conn.close()
     return redirect(url_for('admin_panel'))
 
-# المسار الخاص بجودوت لطلب البيانات والمزامنة
+# 🌐 المسار الخاص بجودوت لجلب حالة اللاعب ومزامنتها
 @app.route('/get_player_status', methods=['GET'])
 def get_player_status():
     username = request.args.get('username')
@@ -270,6 +269,34 @@ def get_player_status():
             "is_banned": 0,
             "admin_message": "لا يوجد"
         })
+
+# 🆕 مسار التسجيل الجديد لحل مشكلة الـ 404 في جودوت
+@app.route('/register', methods=['POST', 'GET'])
+def register():
+    data = request.get_json(silent=True) or request.form
+    username = data.get('username')
+    
+    if not username:
+        return jsonify({"status": "error", "message": "اسم المستخدم مفقود"}), 400
+        
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT username FROM players WHERE username = ?', (username,))
+    existing = cursor.fetchone()
+    
+    if existing:
+        conn.close()
+        return jsonify({"status": "error", "message": "اسم المستخدم مستخدم مسبقاً"})
+    
+    cursor.execute('''
+        INSERT INTO players (username, money, is_banned, admin_message)
+        VALUES (?, 600, 0, 'لا يوجد')
+    ''', (username,))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({"status": "success", "message": "تم إنشاء الحساب بنجاح!"})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
