@@ -1,36 +1,54 @@
 from flask import Flask, request, jsonify, redirect, url_for
+import os
+import psycopg2
 import sqlite3
 
 app = Flask(__name__)
-DB_NAME = "database.db"
+
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+def get_db_connection():
+    if DATABASE_URL:
+        conn = psycopg2.connect(DATABASE_URL)
+        return conn, 'pg'
+    else:
+        conn = sqlite3.connect("database.db")
+        return conn, 'sqlite'
 
 def init_db():
-    conn = sqlite3.connect(DB_NAME)
+    conn, db_type = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS players (
-            username TEXT PRIMARY KEY,
-            password TEXT DEFAULT '',
-            email TEXT DEFAULT '',
-            money INTEGER DEFAULT 600,
-            is_banned INTEGER DEFAULT 0,
-            admin_message TEXT DEFAULT ''
-        )
-    ''')
     
-    cursor.execute("PRAGMA table_info(players)")
-    columns = [col[1] for col in cursor.fetchall()]
-    if 'password' not in columns:
-        cursor.execute("ALTER TABLE players ADD COLUMN password TEXT DEFAULT ''")
-    if 'email' not in columns:
-        cursor.execute("ALTER TABLE players ADD COLUMN email TEXT DEFAULT ''")
-
+    if db_type == 'pg':
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS players (
+                username VARCHAR(100) PRIMARY KEY,
+                password TEXT DEFAULT '',
+                email TEXT DEFAULT '',
+                money INTEGER DEFAULT 600,
+                is_banned INTEGER DEFAULT 0,
+                admin_message TEXT DEFAULT ''
+            );
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS players (
+                username TEXT PRIMARY KEY,
+                password TEXT DEFAULT '',
+                email TEXT DEFAULT '',
+                money INTEGER DEFAULT 600,
+                is_banned INTEGER DEFAULT 0,
+                admin_message TEXT DEFAULT ''
+            );
+        ''')
+    
     conn.commit()
+    cursor.close()
     conn.close()
 
 init_db()
 
-# 🏠 الصفحة الرئيسية (مقدمة اللعبة وزر التحميل)
+# 🏠 الصفحة الرئيسية العامة (مقدمة أنيقة وزر قريباً)
 @app.route('/')
 def home():
     return '''
@@ -83,6 +101,7 @@ def home():
                 font-size: 18px;
                 border-radius: 30px;
                 text-decoration: none;
+                cursor: not-allowed;
                 box-shadow: 0 0 15px #ff00ff;
                 transition: transform 0.2s;
             }
@@ -111,10 +130,11 @@ def home():
 # 👑 لوحة تحكم الإمبراطور عزو
 @app.route('/admin', methods=['GET'])
 def admin_panel():
-    conn = sqlite3.connect(DB_NAME)
+    conn, db_type = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT username, password, email, money, is_banned, admin_message FROM players')
     players = cursor.fetchall()
+    cursor.close()
     conn.close()
 
     html = '''
@@ -295,26 +315,41 @@ def quick_action():
     action = request.args.get('action')
     username = request.args.get('username')
     
-    conn = sqlite3.connect(DB_NAME)
+    conn, db_type = get_db_connection()
     cursor = conn.cursor()
     
     if action == 'toggle_ban' and username:
-        cursor.execute('UPDATE players SET is_banned = 1 - is_banned WHERE username = ?', (username,))
+        if db_type == 'pg':
+            cursor.execute('UPDATE players SET is_banned = 1 - is_banned WHERE username = %s', (username,))
+        else:
+            cursor.execute('UPDATE players SET is_banned = 1 - is_banned WHERE username = ?', (username,))
     
     elif action == 'update_money' and username:
         amount = request.args.get('amount', type=int, default=0)
         sub_action = request.args.get('sub_action')
         if sub_action == 'plus':
-            cursor.execute('UPDATE players SET money = money + ? WHERE username = ?', (amount, username))
+            if db_type == 'pg':
+                cursor.execute('UPDATE players SET money = money + %s WHERE username = %s', (amount, username))
+            else:
+                cursor.execute('UPDATE players SET money = money + ? WHERE username = ?', (amount, username))
         elif sub_action == 'minus':
-            cursor.execute('UPDATE players SET money = money - ? WHERE username = ?', (amount, username))
+            if db_type == 'pg':
+                cursor.execute('UPDATE players SET money = money - %s WHERE username = %s', (amount, username))
+            else:
+                cursor.execute('UPDATE players SET money = money - ? WHERE username = ?', (amount, username))
             
     elif action == 'send_message' and username:
         msg = request.args.get('message', default='')
-        cursor.execute('UPDATE players SET admin_message = ? WHERE username = ?', (msg, username))
+        if db_type == 'pg':
+            cursor.execute('UPDATE players SET admin_message = %s WHERE username = %s', (msg, username))
+        else:
+            cursor.execute('UPDATE players SET admin_message = ? WHERE username = ?', (msg, username))
         
     elif action == 'delete' and username:
-        cursor.execute('DELETE FROM players WHERE username = ?', (username,))
+        if db_type == 'pg':
+            cursor.execute('DELETE FROM players WHERE username = %s', (username,))
+        else:
+            cursor.execute('DELETE FROM players WHERE username = ?', (username,))
         
     elif action == 'update_profile':
         old_username = request.args.get('old_username')
@@ -323,17 +358,25 @@ def quick_action():
         new_password = request.args.get('new_password', '')
         
         if old_username and new_username:
-            cursor.execute('''
-                UPDATE players 
-                SET username = ?, email = ?, password = ? 
-                WHERE username = ?
-            ''', (new_username, new_email, new_password, old_username))
+            if db_type == 'pg':
+                cursor.execute('''
+                    UPDATE players 
+                    SET username = %s, email = %s, password = %s 
+                    WHERE username = %s
+                ''', (new_username, new_email, new_password, old_username))
+            else:
+                cursor.execute('''
+                    UPDATE players 
+                    SET username = ?, email = ?, password = ? 
+                    WHERE username = ?
+                ''', (new_username, new_email, new_password, old_username))
         
     conn.commit()
+    cursor.close()
     conn.close()
     return redirect(url_for('admin_panel'))
 
-# 💳 خصم الفلوس الحقيقي من السيرفر
+# 💳 خصم الفلوس الحقيقي من السيرفر (للربط مع Godot)
 @app.route('/deduct_money', methods=['POST'])
 def deduct_money():
     data = request.get_json(silent=True) or request.form
@@ -343,24 +386,36 @@ def deduct_money():
     if not username or amount <= 0:
         return jsonify({"status": "error", "message": "بيانات غير مكتملة"}), 400
 
-    conn = sqlite3.connect(DB_NAME)
+    conn, db_type = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute('SELECT money FROM players WHERE username = ?', (username,))
+    if db_type == 'pg':
+        cursor.execute('SELECT money FROM players WHERE username = %s', (username,))
+    else:
+        cursor.execute('SELECT money FROM players WHERE username = ?', (username,))
+        
     row = cursor.fetchone()
     
     if not row:
+        cursor.close()
         conn.close()
         return jsonify({"status": "error", "message": "اللاعب غير موجود"}), 404
         
     current_money = row[0]
     if current_money < amount:
+        cursor.close()
         conn.close()
         return jsonify({"status": "error", "message": "الرصيد غير كافٍ!"}), 400
 
     new_money = current_money - amount
-    cursor.execute('UPDATE players SET money = ? WHERE username = ?', (new_money, username))
+    
+    if db_type == 'pg':
+        cursor.execute('UPDATE players SET money = %s WHERE username = %s', (new_money, username))
+    else:
+        cursor.execute('UPDATE players SET money = ? WHERE username = ?', (new_money, username))
+        
     conn.commit()
+    cursor.close()
     conn.close()
 
     return jsonify({
@@ -379,16 +434,24 @@ def login():
     if not login_id:
         return jsonify({"status": "error", "message": "بيانات مفقودة"}), 400
 
-    conn = sqlite3.connect(DB_NAME)
+    conn, db_type = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute('''
-        SELECT username, email, money, is_banned, admin_message 
-        FROM players 
-        WHERE (email = ? OR username = ?) AND password = ?
-    ''', (login_id, login_id, password))
+    if db_type == 'pg':
+        cursor.execute('''
+            SELECT username, email, money, is_banned, admin_message 
+            FROM players 
+            WHERE (email = %s OR username = %s) AND password = %s
+        ''', (login_id, login_id, password))
+    else:
+        cursor.execute('''
+            SELECT username, email, money, is_banned, admin_message 
+            FROM players 
+            WHERE (email = ? OR username = ?) AND password = ?
+        ''', (login_id, login_id, password))
     
     player = cursor.fetchone()
+    cursor.close()
     conn.close()
 
     if player:
@@ -421,34 +484,53 @@ def register():
     if not username:
         return jsonify({"status": "error", "message": "بيانات الحساب غير كاملة"}), 400
 
-    conn = sqlite3.connect(DB_NAME)
+    conn, db_type = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute('SELECT username FROM players WHERE username = ? OR (email != "" AND email = ?)', (username, email))
+    if db_type == 'pg':
+        cursor.execute('SELECT username FROM players WHERE username = %s OR (email != \'\' AND email = %s)', (username, email))
+    else:
+        cursor.execute('SELECT username FROM players WHERE username = ? OR (email != "" AND email = ?)', (username, email))
+        
     if cursor.fetchone():
+        cursor.close()
         conn.close()
         return jsonify({"status": "error", "message": "الحساب أو البريد مستخدم مسبقاً!"})
 
-    cursor.execute('''
-        INSERT INTO players (username, password, email, money, is_banned, admin_message)
-        VALUES (?, ?, ?, 600, 0, 'لا يوجد')
-    ''', (username, password, email))
+    if db_type == 'pg':
+        cursor.execute('''
+            INSERT INTO players (username, password, email, money, is_banned, admin_message)
+            VALUES (%s, %s, %s, 600, 0, 'لا يوجد')
+        ''', (username, password, email))
+    else:
+        cursor.execute('''
+            INSERT INTO players (username, password, email, money, is_banned, admin_message)
+            VALUES (?, ?, ?, 600, 0, 'لا يوجد')
+        ''', (username, password, email))
+        
     conn.commit()
+    cursor.close()
     conn.close()
 
     return jsonify({"status": "success", "message": "تم إنشاء الحساب بنجاح!"})
 
-# 🌐 جلب حالة اللاعب
+# 🌐 حالة اللاعب
 @app.route('/get_player_status', methods=['GET'])
 def get_player_status():
     username = request.args.get('username')
     if not username:
         return jsonify({"error": "اسم اللاعب مفقود"}), 400
         
-    conn = sqlite3.connect(DB_NAME)
+    conn, db_type = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT money, is_banned, admin_message FROM players WHERE username = ?', (username,))
+    
+    if db_type == 'pg':
+        cursor.execute('SELECT money, is_banned, admin_message FROM players WHERE username = %s', (username,))
+    else:
+        cursor.execute('SELECT money, is_banned, admin_message FROM players WHERE username = ?', (username,))
+        
     row = cursor.fetchone()
+    cursor.close()
     conn.close()
 
     if row:
@@ -462,4 +544,4 @@ def get_player_status():
         return jsonify({"error": "اللاعب غير موجود"}), 404
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True)
