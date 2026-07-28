@@ -3,6 +3,9 @@ import os
 import random
 import psycopg2
 import sqlite3
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 app = Flask(__name__)
 
@@ -82,16 +85,40 @@ def send_code():
         data = request.get_json(silent=True) or request.form or request.args
         email = str(data.get('email', '')).strip()
         
-        if not email:
-            return jsonify({"status": "error", "message": "البريد الإلكتروني مطلوب"}), 400
+        if not email or "@" not in email:
+            return jsonify({"status": "error", "message": "البريد الإلكتروني غير صالح"}), 400
             
         otp_code = str(random.randint(1000, 9999))
-        print(f"🔑 رمز التحقق لـ {email} هو: {otp_code}")
+        
+        sender_email = os.environ.get('MAIL_USERNAME', 'your_sender_email@gmail.com')
+        sender_password = os.environ.get('MAIL_PASSWORD', 'your_app_password')
+        
+        subject = "رمز التحقق - Relic Curse"
+        body = f"أهلاً بك يا بطل!\n\nرمز التحقق الخاص بك في لعبة Relic Curse هو: {otp_code}\n\nلا تقم بمشاركته مع أحد."
+        
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+        
+        # إرسال الكود حصرياً إلى البريد الإلكتروني عبر السيرفر
+        try:
+            server = smtplib.SMTP('smtp.gmail.com', 587)
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, email, msg.as_string())
+            server.quit()
+        except Exception as mail_err:
+            print(f"⚠️ فشل إرسال البريد الإلكتروني: {str(mail_err)}")
+            return jsonify({
+                "status": "error",
+                "message": "تعذر إرسال الرمز إلى البريد الإلكتروني، تأكد من بيانات الـ SMTP."
+            }), 500
 
         return jsonify({
             "status": "success",
-            "message": f"تم إرسال الرمز بنجاح! (الرمز: {otp_code})",
-            "otp": otp_code
+            "message": "تم إرسال رمز التحقق إلى بريدك الإلكتروني بنجاح!"
         })
     except Exception as e:
         return jsonify({"status": "error", "message": f"خطأ بالسرفر: {str(e)}"}), 500
@@ -281,6 +308,7 @@ def quick_action():
     conn.close()
     return redirect(url_for('admin_panel'))
 
+# مسار متزامن لخصم أو تعديل الفلوس أثناء اللعب
 @app.route('/deduct_money', methods=['POST'])
 def deduct_money():
     data = request.get_json(silent=True) or request.form
@@ -343,8 +371,14 @@ def login():
 
         if player:
             username, email, money, is_banned, admin_message, avatar = player
+            
+            # فحص الحظر وإرسال استجابة تؤدي لعودة اللاعب فوراً لصفحة تسجيل الدخول في حال كان محظوراً
             if is_banned == 1:
-                return jsonify({"status": "error", "message": "هذا الحساب محظور من الإدارة!"})
+                return jsonify({
+                    "status": "error", 
+                    "message": "هذا الحساب محظور من الإدارة!", 
+                    "is_banned": 1
+                })
 
             return jsonify({
                 "status": "success",
@@ -353,7 +387,8 @@ def login():
                 "email": email,
                 "money": money,
                 "admin_message": admin_message,
-                "avatar": avatar
+                "avatar": avatar,
+                "is_banned": 0
             })
         else:
             return jsonify({"status": "error", "message": "بيانات الدخول غير صحيحة!"})
