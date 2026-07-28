@@ -500,7 +500,7 @@ def get_player_status():
         return jsonify({"error": "اسم اللاعب مفقود"}), 400
         
     conn, db_type = get_db_connection()
-    cursor.cursor = cursor = conn.cursor()
+    cursor = conn.cursor()
     
     if db_type == 'pg':
         cursor.execute('SELECT money, is_banned, admin_message, avatar FROM players WHERE username = %s', (username,))
