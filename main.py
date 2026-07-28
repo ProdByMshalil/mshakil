@@ -3,9 +3,6 @@ import os
 import random
 import psycopg2
 import sqlite3
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 app = Flask(__name__)
 
@@ -31,11 +28,11 @@ def init_db():
                 email TEXT DEFAULT '',
                 money INTEGER DEFAULT 600,
                 is_banned INTEGER DEFAULT 0,
-                admin_message TEXT DEFAULT '',
+                admin_message TEXT DEFAULT 'لا يوجد',
                 avatar TEXT DEFAULT ''
             );
         ''')
-        for col, col_type in [('avatar', 'TEXT DEFAULT \'\''), ('admin_message', 'TEXT DEFAULT \'\''), ('is_banned', 'INTEGER DEFAULT 0'), ('money', 'INTEGER DEFAULT 600'), ('email', 'TEXT DEFAULT \'\''), ('password', 'TEXT DEFAULT \'\'')]:
+        for col, col_type in [('avatar', 'TEXT DEFAULT \'\''), ('admin_message', 'TEXT DEFAULT \'لا يوجد\''), ('is_banned', 'INTEGER DEFAULT 0'), ('money', 'INTEGER DEFAULT 600'), ('email', 'TEXT DEFAULT \'\''), ('password', 'TEXT DEFAULT \'\'')]:
             try:
                 cursor.execute(f'ALTER TABLE players ADD COLUMN IF NOT EXISTS {col} {col_type}')
             except:
@@ -48,7 +45,7 @@ def init_db():
                 email TEXT DEFAULT '',
                 money INTEGER DEFAULT 600,
                 is_banned INTEGER DEFAULT 0,
-                admin_message TEXT DEFAULT '',
+                admin_message TEXT DEFAULT 'لا يوجد',
                 avatar TEXT DEFAULT ''
             );
         ''')
@@ -70,61 +67,43 @@ def home():
         <style>
             body { background: #0b0c10; color: #fff; font-family: Tahoma; text-align: center; padding: 50px; }
             h1 { color: #00ffcc; }
+            a { color: #ff00ff; font-size: 20px; text-decoration: none; border: 2px solid #ff00ff; padding: 10px 20px; border-radius: 8px; display: inline-block; margin-top: 20px; }
         </style>
     </head>
     <body>
         <h1>🎮 خوادم Relic Curse تعمل بكفاءة!</h1>
         <p>السيرفر متصل وقاعدة البيانات تعمل بنجاح.</p>
+        <a href="/admin">الذهاب إلى لوحة تحكم الإمبراطور 👑</a>
     </body>
     </html>
     '''
 
-# مسار إرسال رمز التحقق (يستقبل من اللعبة أو الموقع ويتحقق من إعدادات البريد)
+# مسار إرسال رمز التحقق (يطبع الكود مباشرة في التيرمنال لسهولة الاستخدام)
 @app.route('/send-code', methods=['POST', 'GET'])
 def send_code():
     try:
         data = request.get_json(silent=True) or request.form or request.args
         email = str(data.get('email', '')).strip()
         
-        if not email or "@" not in email:
-            return jsonify({"status": "error", "message": "البريد الإلكتروني غير صالح"}), 400
+        if not email:
+            return jsonify({"status": "error", "message": "البريد الإلكتروني مطلوب"}), 400
             
         otp_code = str(random.randint(1000, 9999))
         
-        sender_email = os.environ.get('MAIL_USERNAME', '')
-        sender_password = os.environ.get('MAIL_PASSWORD', '')
-        
-        if not sender_email or not sender_password:
-            # لو بيانات البريد مش محددة في البيئة، نرجع الرمز كاستجابة تجريبية عشان اللعبة ما تتعطلش
-            return jsonify({
-                "status": "success",
-                "message": "تم إنشاء الرمز بنجاح",
-                "code": otp_code 
-            })
-        
-        subject = "رمز التحقق - Relic Curse"
-        body = f"أهلاً بك يا بطل!\n\nرمز التحقق الخاص بك في لعبة Relic Curse هو: {otp_code}\n\nلا تقم بمشاركته مع أحد."
-        
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = email
-        msg['Subject'] = subject
-        msg.attach(MIMEText(body, 'plain', 'utf-8'))
-        
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, email, msg.as_string())
-        server.quit()
+        # طباعة الكود في شاشة السيرفر (التيرمنال) لكي تراه فوراً
+        print(f"\n================================")
+        print(f"🔑 [رمز التحقق OTP] للإيميل ({email}) هو: {otp_code}")
+        print(f"================================\n")
 
         return jsonify({
             "status": "success",
-            "message": "تم إرسال رمز التحقق إلى بريدك الإلكتروني بنجاح!"
+            "message": "تم إرسال رمز التحقق بنجاح!",
+            "debug_code": otp_code # يرسل للعميل أيضاً كضمان للظهور الفوري
         })
     except Exception as e:
         return jsonify({"status": "error", "message": f"خطأ بالسرفر: {str(e)}"}), 500
 
-# لوحة التحكم الخاصة بالإمبراطور عزو
+# لوحة التحكم الكاملة للإمبراطور عزو
 @app.route('/admin', methods=['GET'])
 def admin_panel():
     conn, db_type = get_db_connection()
@@ -158,7 +137,7 @@ def admin_panel():
             .msg-text { color: #ff00ff; }
             .pass-text { color: #ffcc00; font-family: monospace; }
             .control-box { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; background: #1a0236; padding: 8px; border-radius: 8px; }
-            .input-val { background: #2d0b5a; border: 1px solid #ff00ff; color: #fff; padding: 5px; border-radius: 4px; width: 95px; text-align: center; font-size: 11px; }
+            .input-val { background: #2d0b5a; border: 1px solid #ff00ff; color: #fff; padding: 5px; border-radius: 4px; width: 90px; text-align: center; font-size: 11px; }
             .btn { padding: 5px 10px; border: none; border-radius: 4px; color: white; cursor: pointer; font-weight: bold; font-size: 11px; }
             .btn-ban { background-color: #ff0055; }
             .btn-unban { background-color: #00cc66; }
@@ -180,11 +159,11 @@ def admin_panel():
                         <th>اللاعب</th>
                         <th>كلمة المرور</th>
                         <th>البريد الإلكتروني</th>
-                        <th>الفلوس الحالية</th>
-                        <th>حالة الحساب</th>
+                        <th>الفلوس</th>
+                        <th>الحالة</th>
                         <th>رسالة الإدارة</th>
-                        <th>تعديل البيانات السريع</th>
-                        <th>التحكم بالنظام</th>
+                        <th>تعديل البيانات</th>
+                        <th>التحكم الفوري</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -215,11 +194,11 @@ def admin_panel():
                             <form action="/quick_action" method="GET" style="display:flex; gap:4px; flex-direction:column;">
                                 <input type="hidden" name="action" value="update_profile">
                                 <input type="hidden" name="old_username" value="{username}">
-                                <input type="text" name="new_username" class="input-val" value="{username}" placeholder="الاسم الجديد" required>
-                                <input type="text" name="new_email" class="input-val" value="{email}" placeholder="البريد الجديد">
-                                <input type="text" name="new_password" class="input-val" value="{password}" placeholder="كلمة السر">
+                                <input type="text" name="new_username" class="input-val" value="{username}" placeholder="الاسم" required>
+                                <input type="text" name="new_email" class="input-val" value="{email}" placeholder="الإيميل">
+                                <input type="text" name="new_password" class="input-val" value="{password}" placeholder="الباسورد">
                                 <input type="text" name="new_avatar" class="input-val" value="{avatar}" placeholder="رابط الصورة">
-                                <button type="submit" class="btn btn-edit">✏️ حفظ التعديل</button>
+                                <button type="submit" class="btn btn-edit">✏️ حفظ</button>
                             </form>
                         </td>
 
@@ -232,17 +211,17 @@ def admin_panel():
                                     <input type="hidden" name="username" value="{username}">
                                     <input type="number" name="amount" class="input-val" placeholder="المبلغ" required>
                                     <button type="submit" name="sub_action" value="plus" class="btn btn-plus">+ زيادة</button>
-                                    <button type="submit" name="sub_action" value="minus" class="btn btn-minus">- نقصان</button>
+                                    <button type="submit" name="sub_action" value="minus" class="btn btn-minus">- خصم</button>
                                 </form>
 
                                 <form action="/quick_action" method="GET" style="display:inline; margin:0;">
                                     <input type="hidden" name="action" value="send_message">
                                     <input type="hidden" name="username" value="{username}">
-                                    <input type="text" name="message" class="input-val" placeholder="اكتب الرسالة" required>
+                                    <input type="text" name="message" class="input-val" placeholder="الرسالة" required>
                                     <button type="submit" class="btn btn-msg">📧 إرسال</button>
                                 </form>
 
-                                <button class="btn btn-del" onclick="if(confirm('هل أنت متأكد من الحذف؟')) location.href='/quick_action?action=delete&username={username}'">❌ حذف</button>
+                                <button class="btn btn-del" onclick="if(confirm('هل أنت متأكد؟')) location.href='/quick_action?action=delete&username={username}'">❌ حذف</button>
                             </div>
                         </td>
                     </tr>
@@ -316,54 +295,7 @@ def quick_action():
     conn.close()
     return redirect(url_for('admin_panel'))
 
-# مسار مزامنة وتحديث الفلوس من داخل اللعبة (يعود بالفلوس الجديدة مباشرة)
-@app.route('/update_money_sync', methods=['POST', 'GET'])
-def update_money_sync():
-    data = request.get_json(silent=True) or request.form or request.args
-    username = data.get('username')
-    amount = data.get('amount', type=int, default=0)
-    operation = data.get('operation', 'deduct')
-
-    if not username:
-        return jsonify({"status": "error", "message": "اسم المستخدم مطلوب"}), 400
-
-    conn, db_type = get_db_connection()
-    cursor = conn.cursor()
-    
-    if db_type == 'pg':
-        cursor.execute('SELECT money FROM players WHERE username = %s', (username,))
-    else:
-        cursor.execute('SELECT money FROM players WHERE username = ?', (username,))
-        
-    row = cursor.fetchone()
-    if not row:
-        cursor.close()
-        conn.close()
-        return jsonify({"status": "error", "message": "اللاعب غير موجود"}), 404
-        
-    current_money = row[0]
-    
-    if operation == 'deduct':
-        if current_money < amount:
-            cursor.close()
-            conn.close()
-            return jsonify({"status": "error", "message": "الرصيد غير كافٍ!"}), 400
-        new_money = current_money - amount
-    else:
-        new_money = current_money + amount
-
-    if db_type == 'pg':
-        cursor.execute('UPDATE players SET money = %s WHERE username = %s', (new_money, username))
-    else:
-        cursor.execute('UPDATE players SET money = ? WHERE username = ?', (new_money, username))
-        
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-    return jsonify({"status": "success", "message": "تم تحديث الفلوس بنجاح", "money": new_money})
-
-# مسار تسجيل الدخول (يرسل حالة الحظر والفلوس والبيانات كاملة للعبة بدقة)
+# مسار تسجيل الدخول وجلب التحديثات للعبة (فلوس، حظر، رسائل)
 @app.route('/login', methods=['POST', 'GET'])
 def login():
     try:
@@ -386,30 +318,21 @@ def login():
         if player:
             username, email, money, is_banned, admin_message, avatar = player
             
-            # إرسال حالة الحظر بوضوح تام للعبة
-            if is_banned == 1:
-                return jsonify({
-                    "status": "error", 
-                    "message": "هذا الحساب محظور من الإدارة!", 
-                    "is_banned": 1
-                })
-
             return jsonify({
                 "status": "success",
-                "message": "تم تسجيل الدخول بنجاح!",
+                "message": "تم التحديث بنجاح!",
                 "username": username,
                 "email": email,
                 "money": money,
                 "admin_message": admin_message,
                 "avatar": avatar,
-                "is_banned": 0
+                "is_banned": is_banned # ترسل 0 لو نشط، و 1 لو محظور فوراً
             })
         else:
             return jsonify({"status": "error", "message": "بيانات الدخول غير صحيحة!"})
     except Exception as e:
         return jsonify({"status": "error", "message": f"خطأ بالسرفر: {str(e)}"}), 500
 
-# مسار التسجيل (يدعم الحقلين avatar و avatar_path لعدم حدوث أي خطأ)
 @app.route('/register', methods=['POST', 'GET'])
 def register():
     try:
