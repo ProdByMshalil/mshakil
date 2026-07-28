@@ -81,17 +81,12 @@ def send_otp():
     try:
         data = request.get_json(silent=True) or request.form or request.args
         email = str(data.get('email', '')).strip()
-        
-        # توليد رمز التحقق (OTP)
         otp_code = str(random.randint(1000, 9999))
         
-        # تصميم نيون فخم جاهز للاستقبال والعرض
-        neon_display_text = f"✨ [ Relic Curse OTP ] ✨\nرمز التحقق الخاص بك: {otp_code}\nلا تقم بمشاركته أبداً!"
-
         if request.is_json or request.args.get('format') == 'json':
             return jsonify({
                 "status": "success",
-                "message": neon_display_text,
+                "message": f"رمز التحقق الخاص بك: {otp_code}",
                 "otp": otp_code
             })
         
@@ -406,10 +401,11 @@ def register():
         conn, db_type = get_db_connection()
         cursor = conn.cursor()
 
+        # التحقق الآمن من وجود المستخدم مسبقاً
         if db_type == 'pg':
-            cursor.execute('SELECT username FROM players WHERE username = %s OR (email != \'\' AND email = %s)', (username, email))
+            cursor.execute('SELECT username FROM players WHERE username = %s OR email = %s', (username, email))
         else:
-            cursor.execute('SELECT username FROM players WHERE username = ? OR (email != "" AND email = ?)', (username, email))
+            cursor.execute('SELECT username FROM players WHERE username = ? OR email = ?', (username, email))
             
         if cursor.fetchone():
             cursor.close()
