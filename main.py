@@ -102,7 +102,6 @@ def send_code():
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain', 'utf-8'))
         
-        # إرسال الكود حصرياً إلى البريد الإلكتروني عبر السيرفر
         try:
             server = smtplib.SMTP('smtp.gmail.com', 587)
             server.starttls()
@@ -165,7 +164,7 @@ def admin_panel():
             .btn-msg { background-color: #007bff; }
             .btn-edit { background-color: #9900ff; }
             .btn-del { background-color: #555; }
-            .avatar-img { width: 35px; height: 35px; border-radius: 50%; object-fit: cover; border: 1px solid #00ffcc; }
+            .avatar-img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #00ffcc; background: #222; }
         </style>
     </head>
     <body>
@@ -193,7 +192,11 @@ def admin_panel():
         status_str = '<span class="status-active">🟢 نشط</span>' if is_banned == 0 else '<span class="status-banned">🔴 محظور</span>'
         ban_btn_label = 'حظر' if is_banned == 0 else 'فك الحظر'
         ban_btn_class = 'btn-ban' if is_banned == 0 else 'btn-unban'
-        avatar_display = f'<img src="{avatar}" class="avatar-img">' if avatar else '<span>👤</span>'
+        
+        if avatar and avatar.strip() != '':
+            avatar_display = f'<img src="{avatar}" class="avatar-img" onerror="this.onerror=null; this.src=\'https://cdn-icons-png.flaticon.com/512/149/149071.png\';">'
+        else:
+            avatar_display = '<img src="https://cdn-icons-png.flaticon.com/512/149/149071.png" class="avatar-img">'
         
         html += f'''
                     <tr>
@@ -212,6 +215,7 @@ def admin_panel():
                                 <input type="text" name="new_username" class="input-val" value="{username}" placeholder="الاسم الجديد" required>
                                 <input type="text" name="new_email" class="input-val" value="{email}" placeholder="البريد الجديد">
                                 <input type="text" name="new_password" class="input-val" value="{password}" placeholder="كلمة السر">
+                                <input type="text" name="new_avatar" class="input-val" value="{avatar}" placeholder="رابط الصورة">
                                 <button type="submit" class="btn btn-edit">✏️ حفظ التعديل</button>
                             </form>
                         </td>
@@ -296,27 +300,29 @@ def quick_action():
         new_username = request.args.get('new_username')
         new_email = request.args.get('new_email', '')
         new_password = request.args.get('new_password', '')
+        new_avatar = request.args.get('new_avatar', '')
         
         if old_username and new_username:
             if db_type == 'pg':
-                cursor.execute('UPDATE players SET username = %s, email = %s, password = %s WHERE username = %s', (new_username, new_email, new_password, old_username))
+                cursor.execute('UPDATE players SET username = %s, email = %s, password = %s, avatar = %s WHERE username = %s', (new_username, new_email, new_password, new_avatar, old_username))
             else:
-                cursor.execute('UPDATE players SET username = ?, email = ?, password = ? WHERE username = ?', (new_username, new_email, new_password, old_username))
+                cursor.execute('UPDATE players SET username = ?, email = ?, password = ?, avatar = ? WHERE username = ?', (new_username, new_email, new_password, new_avatar, old_username))
         
     conn.commit()
     cursor.close()
     conn.close()
     return redirect(url_for('admin_panel'))
 
-# مسار متزامن لخصم أو تعديل الفلوس أثناء اللعب
-@app.route('/deduct_money', methods=['POST'])
-def deduct_money():
+# مسار متزامن لتحديث أو خصم الفلوس من داخل اللعبة وإرجاع القيمة الجديدة
+@app.route('/update_money_sync', methods=['POST'])
+def update_money_sync():
     data = request.get_json(silent=True) or request.form
     username = data.get('username')
     amount = data.get('amount', type=int, default=0)
+    operation = data.get('operation', 'deduct') # deduct or add
 
-    if not username or amount <= 0:
-        return jsonify({"status": "error", "message": "بيانات غير مكتملة"}), 400
+    if not username:
+        return jsonify({"status": "error", "message": "اسم المستخدم مطلوب"}), 400
 
     conn, db_type = get_db_connection()
     cursor = conn.cursor()
@@ -333,12 +339,16 @@ def deduct_money():
         return jsonify({"status": "error", "message": "اللاعب غير موجود"}), 404
         
     current_money = row[0]
-    if current_money < amount:
-        cursor.close()
-        conn.close()
-        return jsonify({"status": "error", "message": "الرصيد غير كافٍ!"}), 400
+    
+    if operation == 'deduct':
+        if current_money < amount:
+            cursor.close()
+            conn.close()
+            return jsonify({"status": "error", "message": "الرصيد غير كافٍ!"}), 400
+        new_money = current_money - amount
+    else:
+        new_money = current_money + amount
 
-    new_money = current_money - amount
     if db_type == 'pg':
         cursor.execute('UPDATE players SET money = %s WHERE username = %s', (new_money, username))
     else:
@@ -348,7 +358,7 @@ def deduct_money():
     cursor.close()
     conn.close()
 
-    return jsonify({"status": "success", "message": "تم الخصم بنجاح", "new_money": new_money})
+    return jsonify({"status": "success", "message": "تم تحديث الفلوس بنجاح", "money": new_money})
 
 @app.route('/login', methods=['POST', 'GET'])
 def login():
@@ -372,7 +382,7 @@ def login():
         if player:
             username, email, money, is_banned, admin_message, avatar = player
             
-            # فحص الحظر وإرسال استجابة تؤدي لعودة اللاعب فوراً لصفحة تسجيل الدخول في حال كان محظوراً
+            # إرجاع حالة الحظر بوضوح للعبة
             if is_banned == 1:
                 return jsonify({
                     "status": "error", 
