@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, redirect, url_for
 import os
+import random
 import psycopg2
 import sqlite3
 
@@ -74,6 +75,107 @@ def home():
     </body>
     </html>
     '''
+
+# مسار توليد وإرسال الرمز (OTP) مع تصميم النيون الفاخر كصفحة ويب أو استجابة جاهزة
+@app.route('/send_otp', methods=['POST', 'GET'])
+def send_otp():
+    data = request.get_json(silent=True) or request.form or request.args
+    email = str(data.get('email', '')).strip()
+    
+    # توليد رمز عشوائي مكون من 4 أو 6 أرقام
+    otp_code = str(random.randint(1000, 9999))
+    
+    # قالب HTML جاهز بتأثيرات النيون الفخمة والخط الممتاز (Cairo)
+    neon_html = f"""
+    <!DOCTYPE html>
+    <html lang="ar" dir="rtl">
+    <head>
+        <meta charset="UTF-8">
+        <title>رمز التحقق - Relic Curse</title>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap');
+            body {{
+                background-color: #0b0c10;
+                margin: 0;
+                padding: 0;
+                font-family: 'Cairo', Tahoma, sans-serif;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+            }}
+            .email-container {{
+                width: 100%;
+                max-width: 500px;
+                background: linear-gradient(135deg, #120124, #1a0236);
+                border: 2px solid #00ffcc;
+                border-radius: 20px;
+                box-shadow: 0 0 30px rgba(0, 255, 204, 0.5);
+                padding: 40px;
+                text-align: center;
+                color: #ffffff;
+                box-sizing: border-box;
+            }}
+            h1 {{
+                color: #00ffcc;
+                font-size: 26px;
+                text-shadow: 0 0 10px #00ffcc, 0 0 20px #00ffcc;
+                margin-bottom: 20px;
+            }}
+            p {{
+                font-size: 15px;
+                color: #dddddd;
+                line-height: 1.6;
+            }}
+            .otp-box {{
+                display: inline-block;
+                margin: 25px 0;
+                padding: 15px 30px;
+                background: #000000;
+                border: 2px dashed #ff00ff;
+                border-radius: 12px;
+                font-size: 38px;
+                font-weight: bold;
+                color: #ff00ff;
+                letter-spacing: 6px;
+                box-shadow: 0 0 20px rgba(255, 0, 255, 0.6);
+                text-shadow: 0 0 10px #ff00ff, 0 0 20px #ff00ff;
+            }}
+            .footer {{
+                margin-top: 25px;
+                font-size: 12px;
+                color: #888888;
+                border-top: 1px solid #330033;
+                padding-top: 15px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="email-container">
+            <h1>✨ Relic Curse ✨</h1>
+            <p>أهلاً بك يا إمبراطور!<br>رمز التحقق الخاص بريدك ({email}):</p>
+            
+            <div class="otp-box">{otp_code}</div>
+            
+            <p>أدخل هذا الرمز في اللعبة لإتمام التسجيل وحماية حسابك.</p>
+            
+            <div class="footer">
+                جميع الحقوق محفوظة © لعبة Relic Curse
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    # إذا كانت اللعبة تطلب JSON ترجع البيانات كـ JSON، وإذا تم فتحها مباشرة تظهر الصفحة بالتصميم النيون
+    if request.is_json or request.args.get('format') == 'json':
+        return jsonify({
+            "status": "success",
+            "message": "تم إنشاء الرمز بنجاح",
+            "otp": otp_code
+        })
+    
+    return neon_html
 
 @app.route('/admin', methods=['GET'])
 def admin_panel():
@@ -303,63 +405,82 @@ def deduct_money():
 
 @app.route('/login', methods=['POST', 'GET'])
 def login():
-    data = request.get_json(silent=True) or request.form or request.args
-    login_id = str(data.get('email') or data.get('username') or '').strip()
-    password = str(data.get('password', '')).strip()
+    try:
+        data = request.get_json(silent=True) or request.form or request.args
+        login_id = str(data.get('email') or data.get('username') or '').strip()
+        password = str(data.get('password', '')).strip()
 
-    conn, db_type = get_db_connection()
-    cursor = conn.cursor()
+        conn, db_type = get_db_connection()
+        cursor = conn.cursor()
 
-    if db_type == 'pg':
-        cursor.execute('SELECT username, email, money, is_banned, admin_message, avatar FROM players WHERE (email = %s OR username = %s) AND password = %s', (login_id, login_id, password))
-    else:
-        cursor.execute('SELECT username, email, money, is_banned, admin_message, avatar FROM players WHERE (email = ? OR username = ?) AND password = ?', (login_id, login_id, password))
-    
-    player = cursor.fetchone()
-    cursor.close()
-    conn.close()
+        if db_type == 'pg':
+            cursor.execute('SELECT username, email, money, is_banned, admin_message, avatar FROM players WHERE (email = %s OR username = %s) AND password = %s', (login_id, login_id, password))
+        else:
+            cursor.execute('SELECT username, email, money, is_banned, admin_message, avatar FROM players WHERE (email = ? OR username = ?) AND password = ?', (login_id, login_id, password))
+        
+        player = cursor.fetchone()
+        cursor.close()
+        conn.close()
 
-    if player:
-        username, email, money, is_banned, admin_message, avatar = player
-        if is_banned == 1:
-            return jsonify({"status": "error", "message": "هذا الحساب محظور من الإدارة!"})
+        if player:
+            username, email, money, is_banned, admin_message, avatar = player
+            if is_banned == 1:
+                return jsonify({"status": "error", "message": "هذا الحساب محظور من الإدارة!"})
 
-        return jsonify({
-            "status": "success",
-            "message": "تم تسجيل الدخول بنجاح!",
-            "username": username,
-            "email": email,
-            "money": money,
-            "admin_message": admin_message,
-            "avatar": avatar
-        })
-    else:
-        return jsonify({"status": "error", "message": "بيانات الدخول غير صحيحة!"})
+            return jsonify({
+                "status": "success",
+                "message": "تم تسجيل الدخول بنجاح!",
+                "username": username,
+                "email": email,
+                "money": money,
+                "admin_message": admin_message,
+                "avatar": avatar
+            })
+        else:
+            return jsonify({"status": "error", "message": "بيانات الدخول غير صحيحة!"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"خطأ بالسرفر: {str(e)}"}), 500
 
 @app.route('/register', methods=['POST', 'GET'])
 def register():
-    data = request.get_json(silent=True) or request.form or request.args
-    email = str(data.get('email', '')).strip()
-    username = str(data.get('username', '')).strip()
-    password = str(data.get('password', '')).strip()
-    avatar = str(data.get('avatar', '')).strip()
+    try:
+        data = request.get_json(silent=True) or request.form or request.args
+        email = str(data.get('email', '')).strip()
+        username = str(data.get('username', '')).strip()
+        password = str(data.get('password', '')).strip()
+        avatar = str(data.get('avatar', '')).strip()
 
-    if not username and email: username = email
-    if not email and username: email = username
+        if not username and email: username = email
+        if not email and username: email = username
 
-    conn, db_type = get_db_connection()
-    cursor = conn.cursor()
+        if not username:
+            return jsonify({"status": "error", "message": "بيانات الحساب غير كاملة"}), 400
 
-    if db_type == 'pg':
-        cursor.execute('INSERT INTO players (username, password, email, money, is_banned, admin_message, avatar) VALUES (%s, %s, %s, 600, 0, \'لا يوجد\', %s)', (username, password, email, avatar))
-    else:
-        cursor.execute('INSERT INTO players (username, password, email, money, is_banned, admin_message, avatar) VALUES (?, ?, ?, 600, 0, "لا يوجد", ?)', (username, password, email, avatar))
-        
-    conn.commit()
-    cursor.close()
-    conn.close()
+        conn, db_type = get_db_connection()
+        cursor = conn.cursor()
 
-    return jsonify({"status": "success", "message": "تم إنشاء الحساب بنجاح!"})
+        if db_type == 'pg':
+            cursor.execute('SELECT username FROM players WHERE username = %s OR (email != \'\' AND email = %s)', (username, email))
+        else:
+            cursor.execute('SELECT username FROM players WHERE username = ? OR (email != "" AND email = ?)', (username, email))
+            
+        if cursor.fetchone():
+            cursor.close()
+            conn.close()
+            return jsonify({"status": "error", "message": "الحساب أو البريد مستخدم مسبقاً!"})
+
+        if db_type == 'pg':
+            cursor.execute('INSERT INTO players (username, password, email, money, is_banned, admin_message, avatar) VALUES (%s, %s, %s, 600, 0, \'لا يوجد\', %s)', (username, password, email, avatar))
+        else:
+            cursor.execute('INSERT INTO players (username, password, email, money, is_banned, admin_message, avatar) VALUES (?, ?, ?, 600, 0, "لا يوجد", ?)', (username, password, email, avatar))
+            
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({"status": "success", "message": "تم إنشاء الحساب بنجاح!"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"خطأ بالسرفر: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
