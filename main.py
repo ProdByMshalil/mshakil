@@ -31,6 +31,10 @@ def init_db():
                 avatar TEXT DEFAULT ''
             );
         ''')
+        try:
+            cursor.execute('ALTER TABLE players ADD COLUMN IF NOT EXISTS avatar TEXT DEFAULT ""')
+        except:
+            pass
     else:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS players (
@@ -43,6 +47,10 @@ def init_db():
                 avatar TEXT DEFAULT ''
             );
         ''')
+        try:
+            cursor.execute('ALTER TABLE players ADD COLUMN avatar TEXT DEFAULT ""')
+        except:
+            pass
     
     conn.commit()
     cursor.close()
@@ -50,7 +58,7 @@ def init_db():
 
 init_db()
 
-# 🏠 الصفحة الرئيسية العامة (مقدمة أنيقة وزر قريباً)
+# 🏠 الصفحة الرئيسية العامة
 @app.route('/')
 def home():
     return '''
@@ -106,9 +114,6 @@ def home():
                 cursor: not-allowed;
                 box-shadow: 0 0 15px #ff00ff;
                 transition: transform 0.2s;
-            }
-            .btn-download:hover {
-                transform: scale(1.05);
             }
             .badge {
                 display: block;
@@ -268,7 +273,6 @@ def admin_panel():
                         <td>{status_str}</td>
                         <td class="msg-text">{admin_message}</td>
                         
-                        <!-- 📝 نموذج تعديل (الاسم، البريد، كلمة السر) -->
                         <td>
                             <form action="/quick_action" method="GET" style="display:flex; gap:4px; flex-direction:column;">
                                 <input type="hidden" name="action" value="update_profile">
@@ -280,7 +284,6 @@ def admin_panel():
                             </form>
                         </td>
 
-                        <!-- ⚙️ أدوات التحكم بالسيرفر -->
                         <td>
                             <div class="control-box">
                                 <button class="btn {ban_btn_class}" onclick="location.href='/quick_action?action=toggle_ban&username={username}'">{ban_btn_label}</button>
@@ -315,7 +318,6 @@ def admin_panel():
     '''
     return html
 
-# 🛠️ التحكم السريع
 @app.route('/quick_action', methods=['GET'])
 def quick_action():
     action = request.args.get('action')
@@ -365,24 +367,15 @@ def quick_action():
         
         if old_username and new_username:
             if db_type == 'pg':
-                cursor.execute('''
-                    UPDATE players 
-                    SET username = %s, email = %s, password = %s 
-                    WHERE username = %s
-                ''', (new_username, new_email, new_password, old_username))
+                cursor.execute('UPDATE players SET username = %s, email = %s, password = %s WHERE username = %s', (new_username, new_email, new_password, old_username))
             else:
-                cursor.execute('''
-                    UPDATE players 
-                    SET username = ?, email = ?, password = ? 
-                    WHERE username = ?
-                ''', (new_username, new_email, new_password, old_username))
+                cursor.execute('UPDATE players SET username = ?, email = ?, password = ? WHERE username = ?', (new_username, new_email, new_password, old_username))
         
     conn.commit()
     cursor.close()
     conn.close()
     return redirect(url_for('admin_panel'))
 
-# 💳 خصم الفلوس الحقيقي من السيرفر (للربط مع Godot)
 @app.route('/deduct_money', methods=['POST'])
 def deduct_money():
     data = request.get_json(silent=True) or request.form
@@ -401,7 +394,6 @@ def deduct_money():
         cursor.execute('SELECT money FROM players WHERE username = ?', (username,))
         
     row = cursor.fetchone()
-    
     if not row:
         cursor.close()
         conn.close()
@@ -414,7 +406,6 @@ def deduct_money():
         return jsonify({"status": "error", "message": "الرصيد غير كافٍ!"}), 400
 
     new_money = current_money - amount
-    
     if db_type == 'pg':
         cursor.execute('UPDATE players SET money = %s WHERE username = %s', (new_money, username))
     else:
@@ -424,13 +415,8 @@ def deduct_money():
     cursor.close()
     conn.close()
 
-    return jsonify({
-        "status": "success",
-        "message": "تم الخصم بنجاح",
-        "new_money": new_money
-    })
+    return jsonify({"status": "success", "message": "تم الخصم بنجاح", "new_money": new_money})
 
-# 🌐 تسجيل الدخول
 @app.route('/login', methods=['POST', 'GET'])
 def login():
     data = request.get_json(silent=True) or request.form or request.args
@@ -444,17 +430,9 @@ def login():
     cursor = conn.cursor()
 
     if db_type == 'pg':
-        cursor.execute('''
-            SELECT username, email, money, is_banned, admin_message, avatar 
-            FROM players 
-            WHERE (email = %s OR username = %s) AND password = %s
-        ''', (login_id, login_id, password))
+        cursor.execute('SELECT username, email, money, is_banned, admin_message, avatar FROM players WHERE (email = %s OR username = %s) AND password = %s', (login_id, login_id, password))
     else:
-        cursor.execute('''
-            SELECT username, email, money, is_banned, admin_message, avatar 
-            FROM players 
-            WHERE (email = ? OR username = ?) AND password = ?
-        ''', (login_id, login_id, password))
+        cursor.execute('SELECT username, email, money, is_banned, admin_message, avatar FROM players WHERE (email = ? OR username = ?) AND password = ?', (login_id, login_id, password))
     
     player = cursor.fetchone()
     cursor.close()
@@ -477,7 +455,6 @@ def login():
     else:
         return jsonify({"status": "error", "message": "بيانات الدخول غير صحيحة!"})
 
-# 🌐 إنشاء حساب
 @app.route('/register', methods=['POST', 'GET'])
 def register():
     data = request.get_json(silent=True) or request.form or request.args
@@ -506,15 +483,9 @@ def register():
         return jsonify({"status": "error", "message": "الحساب أو البريد مستخدم مسبقاً!"})
 
     if db_type == 'pg':
-        cursor.execute('''
-            INSERT INTO players (username, password, email, money, is_banned, admin_message, avatar)
-            VALUES (%s, %s, %s, 600, 0, 'لا يوجد', %s)
-        ''', (username, password, email, avatar))
+        cursor.execute('INSERT INTO players (username, password, email, money, is_banned, admin_message, avatar) VALUES (%s, %s, %s, 600, 0, \'لا يوجد\', %s)', (username, password, email, avatar))
     else:
-        cursor.execute('''
-            INSERT INTO players (username, password, email, money, is_banned, admin_message, avatar)
-            VALUES (?, ?, ?, 600, 0, 'لا يوجد', ?)
-        ''', (username, password, email, avatar))
+        cursor.execute('INSERT INTO players (username, password, email, money, is_banned, admin_message, avatar) VALUES (?, ?, ?, 600, 0, "لا يوجد", ?)', (username, password, email, avatar))
         
     conn.commit()
     cursor.close()
@@ -522,7 +493,6 @@ def register():
 
     return jsonify({"status": "success", "message": "تم إنشاء الحساب بنجاح!"})
 
-# 🌐 حالة اللاعب
 @app.route('/get_player_status', methods=['GET'])
 def get_player_status():
     username = request.args.get('username')
@@ -530,7 +500,7 @@ def get_player_status():
         return jsonify({"error": "اسم اللاعب مفقود"}), 400
         
     conn, db_type = get_db_connection()
-    cursor = conn.cursor()
+    cursor.cursor = cursor = conn.cursor()
     
     if db_type == 'pg':
         cursor.execute('SELECT money, is_banned, admin_message, avatar FROM players WHERE username = %s', (username,))
