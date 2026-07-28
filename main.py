@@ -76,106 +76,53 @@ def home():
     </html>
     '''
 
-# مسار توليد وإرسال الرمز (OTP) مع تصميم النيون الفاخر كصفحة ويب أو استجابة جاهزة
 @app.route('/send_otp', methods=['POST', 'GET'])
 def send_otp():
-    data = request.get_json(silent=True) or request.form or request.args
-    email = str(data.get('email', '')).strip()
-    
-    # توليد رمز عشوائي مكون من 4 أو 6 أرقام
-    otp_code = str(random.randint(1000, 9999))
-    
-    # قالب HTML جاهز بتأثيرات النيون الفخمة والخط الممتاز (Cairo)
-    neon_html = f"""
-    <!DOCTYPE html>
-    <html lang="ar" dir="rtl">
-    <head>
-        <meta charset="UTF-8">
-        <title>رمز التحقق - Relic Curse</title>
-        <style>
-            @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap');
-            body {{
-                background-color: #0b0c10;
-                margin: 0;
-                padding: 0;
-                font-family: 'Cairo', Tahoma, sans-serif;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                height: 100vh;
-            }}
-            .email-container {{
-                width: 100%;
-                max-width: 500px;
-                background: linear-gradient(135deg, #120124, #1a0236);
-                border: 2px solid #00ffcc;
-                border-radius: 20px;
-                box-shadow: 0 0 30px rgba(0, 255, 204, 0.5);
-                padding: 40px;
-                text-align: center;
-                color: #ffffff;
-                box-sizing: border-box;
-            }}
-            h1 {{
-                color: #00ffcc;
-                font-size: 26px;
-                text-shadow: 0 0 10px #00ffcc, 0 0 20px #00ffcc;
-                margin-bottom: 20px;
-            }}
-            p {{
-                font-size: 15px;
-                color: #dddddd;
-                line-height: 1.6;
-            }}
-            .otp-box {{
-                display: inline-block;
-                margin: 25px 0;
-                padding: 15px 30px;
-                background: #000000;
-                border: 2px dashed #ff00ff;
-                border-radius: 12px;
-                font-size: 38px;
-                font-weight: bold;
-                color: #ff00ff;
-                letter-spacing: 6px;
-                box-shadow: 0 0 20px rgba(255, 0, 255, 0.6);
-                text-shadow: 0 0 10px #ff00ff, 0 0 20px #ff00ff;
-            }}
-            .footer {{
-                margin-top: 25px;
-                font-size: 12px;
-                color: #888888;
-                border-top: 1px solid #330033;
-                padding-top: 15px;
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="email-container">
-            <h1>✨ Relic Curse ✨</h1>
-            <p>أهلاً بك يا إمبراطور!<br>رمز التحقق الخاص بريدك ({email}):</p>
-            
-            <div class="otp-box">{otp_code}</div>
-            
-            <p>أدخل هذا الرمز في اللعبة لإتمام التسجيل وحماية حسابك.</p>
-            
-            <div class="footer">
-                جميع الحقوق محفوظة © لعبة Relic Curse
+    try:
+        data = request.get_json(silent=True) or request.form or request.args
+        email = str(data.get('email', '')).strip()
+        
+        # توليد رمز التحقق (OTP)
+        otp_code = str(random.randint(1000, 9999))
+        
+        # تصميم نيون فخم جاهز للاستقبال والعرض
+        neon_display_text = f"✨ [ Relic Curse OTP ] ✨\nرمز التحقق الخاص بك: {otp_code}\nلا تقم بمشاركته أبداً!"
+
+        if request.is_json or request.args.get('format') == 'json':
+            return jsonify({
+                "status": "success",
+                "message": neon_display_text,
+                "otp": otp_code
+            })
+        
+        return f"""
+        <!DOCTYPE html>
+        <html lang="ar" dir="rtl">
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap');
+                body {{ background-color: #0b0c10; color: #fff; font-family: 'Cairo', sans-serif; text-align: center; padding-top: 100px; }}
+                .neon-box {{
+                    display: inline-block; padding: 30px 50px; background: #120124;
+                    border: 2px solid #00ffcc; border-radius: 15px;
+                    box-shadow: 0 0 25px rgba(0, 255, 204, 0.6);
+                }}
+                h1 {{ color: #00ffcc; text-shadow: 0 0 10px #00ffcc; }}
+                .code {{ color: #ff00ff; font-size: 40px; text-shadow: 0 0 15px #ff00ff; letter-spacing: 5px; margin: 20px 0; }}
+            </style>
+        </head>
+        <body>
+            <div class="neon-box">
+                <h1>✨ Relic Curse ✨</h1>
+                <p>رمز التحقق لبريدك ({email}):</p>
+                <div class="code">{otp_code}</div>
             </div>
-        </div>
-    </body>
-    </html>
-    """
-    
-    # إذا كانت اللعبة تطلب JSON ترجع البيانات كـ JSON، وإذا تم فتحها مباشرة تظهر الصفحة بالتصميم النيون
-    if request.is_json or request.args.get('format') == 'json':
-        return jsonify({
-            "status": "success",
-            "message": "تم إنشاء الرمز بنجاح",
-            "otp": otp_code
-        })
-    
-    return neon_html
+        </body>
+        </html>
+        """
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"خطأ بالسرفر: {str(e)}"}), 500
 
 @app.route('/admin', methods=['GET'])
 def admin_panel():
