@@ -27,7 +27,8 @@ def init_db():
                 email TEXT DEFAULT '',
                 money INTEGER DEFAULT 600,
                 is_banned INTEGER DEFAULT 0,
-                admin_message TEXT DEFAULT ''
+                admin_message TEXT DEFAULT '',
+                avatar TEXT DEFAULT ''
             );
         ''')
     else:
@@ -38,7 +39,8 @@ def init_db():
                 email TEXT DEFAULT '',
                 money INTEGER DEFAULT 600,
                 is_banned INTEGER DEFAULT 0,
-                admin_message TEXT DEFAULT ''
+                admin_message TEXT DEFAULT '',
+                avatar TEXT DEFAULT ''
             );
         ''')
     
@@ -132,7 +134,7 @@ def home():
 def admin_panel():
     conn, db_type = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT username, password, email, money, is_banned, admin_message FROM players')
+    cursor.execute('SELECT username, password, email, money, is_banned, admin_message, avatar FROM players')
     players = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -226,6 +228,7 @@ def admin_panel():
             .btn-msg { background-color: #007bff; }
             .btn-edit { background-color: #9900ff; }
             .btn-del { background-color: #555; }
+            .avatar-img { width: 35px; height: 35px; border-radius: 50%; object-fit: cover; border: 1px solid #00ffcc; }
         </style>
     </head>
     <body>
@@ -234,6 +237,7 @@ def admin_panel():
             <table>
                 <thead>
                     <tr>
+                        <th>الصورة</th>
                         <th>اللاعب</th>
                         <th>كلمة المرور</th>
                         <th>البريد الإلكتروني</th>
@@ -248,13 +252,15 @@ def admin_panel():
     '''
     
     for p in players:
-        username, password, email, money, is_banned, admin_message = p
+        username, password, email, money, is_banned, admin_message, avatar = p
         status_str = '<span class="status-active">🟢 نشط</span>' if is_banned == 0 else '<span class="status-banned">🔴 محظور</span>'
         ban_btn_label = 'حظر' if is_banned == 0 else 'فك الحظر'
         ban_btn_class = 'btn-ban' if is_banned == 0 else 'btn-unban'
+        avatar_display = f'<img src="{avatar}" class="avatar-img">' if avatar else '<span>👤</span>'
         
         html += f'''
                     <tr>
+                        <td>{avatar_display}</td>
                         <td><b>{username}</b></td>
                         <td class="pass-text">{password}</td>
                         <td>{email}</td>
@@ -439,13 +445,13 @@ def login():
 
     if db_type == 'pg':
         cursor.execute('''
-            SELECT username, email, money, is_banned, admin_message 
+            SELECT username, email, money, is_banned, admin_message, avatar 
             FROM players 
             WHERE (email = %s OR username = %s) AND password = %s
         ''', (login_id, login_id, password))
     else:
         cursor.execute('''
-            SELECT username, email, money, is_banned, admin_message 
+            SELECT username, email, money, is_banned, admin_message, avatar 
             FROM players 
             WHERE (email = ? OR username = ?) AND password = ?
         ''', (login_id, login_id, password))
@@ -455,7 +461,7 @@ def login():
     conn.close()
 
     if player:
-        username, email, money, is_banned, admin_message = player
+        username, email, money, is_banned, admin_message, avatar = player
         if is_banned == 1:
             return jsonify({"status": "error", "message": "هذا الحساب محظور من الإدارة!"})
 
@@ -465,7 +471,8 @@ def login():
             "username": username,
             "email": email,
             "money": money,
-            "admin_message": admin_message
+            "admin_message": admin_message,
+            "avatar": avatar
         })
     else:
         return jsonify({"status": "error", "message": "بيانات الدخول غير صحيحة!"})
@@ -477,6 +484,7 @@ def register():
     email = str(data.get('email', '')).strip()
     username = str(data.get('username', '')).strip()
     password = str(data.get('password', '')).strip()
+    avatar = str(data.get('avatar', '')).strip()
 
     if not username and email: username = email
     if not email and username: email = username
@@ -499,14 +507,14 @@ def register():
 
     if db_type == 'pg':
         cursor.execute('''
-            INSERT INTO players (username, password, email, money, is_banned, admin_message)
-            VALUES (%s, %s, %s, 600, 0, 'لا يوجد')
-        ''', (username, password, email))
+            INSERT INTO players (username, password, email, money, is_banned, admin_message, avatar)
+            VALUES (%s, %s, %s, 600, 0, 'لا يوجد', %s)
+        ''', (username, password, email, avatar))
     else:
         cursor.execute('''
-            INSERT INTO players (username, password, email, money, is_banned, admin_message)
-            VALUES (?, ?, ?, 600, 0, 'لا يوجد')
-        ''', (username, password, email))
+            INSERT INTO players (username, password, email, money, is_banned, admin_message, avatar)
+            VALUES (?, ?, ?, 600, 0, 'لا يوجد', ?)
+        ''', (username, password, email, avatar))
         
     conn.commit()
     cursor.close()
@@ -525,20 +533,21 @@ def get_player_status():
     cursor = conn.cursor()
     
     if db_type == 'pg':
-        cursor.execute('SELECT money, is_banned, admin_message FROM players WHERE username = %s', (username,))
+        cursor.execute('SELECT money, is_banned, admin_message, avatar FROM players WHERE username = %s', (username,))
     else:
-        cursor.execute('SELECT money, is_banned, admin_message FROM players WHERE username = ?', (username,))
+        cursor.execute('SELECT money, is_banned, admin_message, avatar FROM players WHERE username = ?', (username,))
         
     row = cursor.fetchone()
     cursor.close()
     conn.close()
 
     if row:
-        money, is_banned, admin_message = row
+        money, is_banned, admin_message, avatar = row
         return jsonify({
             "money": money,
             "is_banned": is_banned,
-            "admin_message": admin_message
+            "admin_message": admin_message,
+            "avatar": avatar
         })
     else:
         return jsonify({"error": "اللاعب غير موجود"}), 404
