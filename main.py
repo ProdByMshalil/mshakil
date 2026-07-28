@@ -76,46 +76,23 @@ def home():
     </html>
     '''
 
-@app.route('/send_otp', methods=['POST', 'GET'])
-def send_otp():
+@app.route('/send-code', methods=['POST', 'GET'])
+def send_code():
     try:
         data = request.get_json(silent=True) or request.form or request.args
         email = str(data.get('email', '')).strip()
+        
+        if not email:
+            return jsonify({"status": "error", "message": "البريد الإلكتروني مطلوب"}), 400
+            
         otp_code = str(random.randint(1000, 9999))
-        
-        if request.is_json or request.args.get('format') == 'json':
-            return jsonify({
-                "status": "success",
-                "message": f"رمز التحقق الخاص بك: {otp_code}",
-                "otp": otp_code
-            })
-        
-        return f"""
-        <!DOCTYPE html>
-        <html lang="ar" dir="rtl">
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap');
-                body {{ background-color: #0b0c10; color: #fff; font-family: 'Cairo', sans-serif; text-align: center; padding-top: 100px; }}
-                .neon-box {{
-                    display: inline-block; padding: 30px 50px; background: #120124;
-                    border: 2px solid #00ffcc; border-radius: 15px;
-                    box-shadow: 0 0 25px rgba(0, 255, 204, 0.6);
-                }}
-                h1 {{ color: #00ffcc; text-shadow: 0 0 10px #00ffcc; }}
-                .code {{ color: #ff00ff; font-size: 40px; text-shadow: 0 0 15px #ff00ff; letter-spacing: 5px; margin: 20px 0; }}
-            </style>
-        </head>
-        <body>
-            <div class="neon-box">
-                <h1>✨ Relic Curse ✨</h1>
-                <p>رمز التحقق لبريدك ({email}):</p>
-                <div class="code">{otp_code}</div>
-            </div>
-        </body>
-        </html>
-        """
+        print(f"🔑 رمز التحقق لـ {email} هو: {otp_code}")
+
+        return jsonify({
+            "status": "success",
+            "message": f"تم إرسال الرمز بنجاح! (الرمز: {otp_code})",
+            "otp": otp_code
+        })
     except Exception as e:
         return jsonify({"status": "error", "message": f"خطأ بالسرفر: {str(e)}"}), 500
 
@@ -387,21 +364,17 @@ def login():
 def register():
     try:
         data = request.get_json(silent=True) or request.form or request.args
-        email = str(data.get('email', '')).strip()
         username = str(data.get('username', '')).strip()
+        email = str(data.get('email', '')).strip()
         password = str(data.get('password', '')).strip()
-        avatar = str(data.get('avatar', '')).strip()
+        avatar = str(data.get('avatar_path', '')).strip()
 
-        if not username and email: username = email
-        if not email and username: email = username
-
-        if not username:
+        if not username or not email or not password:
             return jsonify({"status": "error", "message": "بيانات الحساب غير كاملة"}), 400
 
         conn, db_type = get_db_connection()
         cursor = conn.cursor()
 
-        # التحقق الآمن من وجود المستخدم مسبقاً
         if db_type == 'pg':
             cursor.execute('SELECT username FROM players WHERE username = %s OR email = %s', (username, email))
         else:
@@ -410,7 +383,7 @@ def register():
         if cursor.fetchone():
             cursor.close()
             conn.close()
-            return jsonify({"status": "error", "message": "الحساب أو البريد مستخدم مسبقاً!"})
+            return jsonify({"status": "error", "message": "اسم المستخدم أو البريد مستخدم مسبقاً!"})
 
         if db_type == 'pg':
             cursor.execute('INSERT INTO players (username, password, email, money, is_banned, admin_message, avatar) VALUES (%s, %s, %s, 600, 0, \'لا يوجد\', %s)', (username, password, email, avatar))
