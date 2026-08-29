@@ -430,4 +430,5 @@ def admin_dashboard():
 
 @app.route('/admin/update_player', methods=['POST'])
 def update_player():
-    if not session.get('admin_
+    if not session.get('admin_logged'):
+
