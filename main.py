@@ -12,49 +12,55 @@ DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def get_db_connection():
     if DATABASE_URL:
-        conn = psycopg2.connect(DATABASE_URL)
-        return conn, 'pg'
-    else:
-        conn = sqlite3.connect("database.db")
-        return conn, 'sqlite'
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            return conn, 'pg'
+        except Exception as e:
+            print(f"⚠️ تعذر الاتصال بـ PostgreSQL: {e}. سيتم استخدام SQLite بدلاً عنها.")
+    
+    conn = sqlite3.connect("database.db", check_same_thread=False)
+    return conn, 'sqlite'
 
 def init_db():
-    conn, db_type = get_db_connection()
-    cursor = conn.cursor()
-    
-    if db_type == 'pg':
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS players (
-                username VARCHAR(100) PRIMARY KEY,
-                password TEXT DEFAULT '',
-                email TEXT DEFAULT '',
-                money INTEGER DEFAULT 600,
-                is_banned INTEGER DEFAULT 0,
-                admin_message TEXT DEFAULT 'لا يوجد',
-                avatar TEXT DEFAULT ''
-            );
-        ''')
-        for col, col_type in [('avatar', 'TEXT DEFAULT \'\''), ('admin_message', 'TEXT DEFAULT \'لا يوجد\''), ('is_banned', 'INTEGER DEFAULT 0'), ('money', 'INTEGER DEFAULT 600'), ('email', 'TEXT DEFAULT \'\''), ('password', 'TEXT DEFAULT \'\'')]:
-            try:
-                cursor.execute(f'ALTER TABLE players ADD COLUMN IF NOT EXISTS {col} {col_type}')
-            except:
-                conn.rollback()
-    else:
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS players (
-                username TEXT PRIMARY KEY,
-                password TEXT DEFAULT '',
-                email TEXT DEFAULT '',
-                money INTEGER DEFAULT 600,
-                is_banned INTEGER DEFAULT 0,
-                admin_message TEXT DEFAULT 'لا يوجد',
-                avatar TEXT DEFAULT ''
-            );
-        ''')
-    
-    conn.commit()
-    cursor.close()
-    conn.close()
+    try:
+        conn, db_type = get_db_connection()
+        cursor = conn.cursor()
+        
+        if db_type == 'pg':
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS players (
+                    username VARCHAR(100) PRIMARY KEY,
+                    password TEXT DEFAULT '',
+                    email TEXT DEFAULT '',
+                    money INTEGER DEFAULT 600,
+                    is_banned INTEGER DEFAULT 0,
+                    admin_message TEXT DEFAULT 'لا يوجد',
+                    avatar TEXT DEFAULT ''
+                );
+            ''')
+            for col, col_type in [('avatar', 'TEXT DEFAULT \'\''), ('admin_message', 'TEXT DEFAULT \'لا يوجد\''), ('is_banned', 'INTEGER DEFAULT 0'), ('money', 'INTEGER DEFAULT 600'), ('email', 'TEXT DEFAULT \'\''), ('password', 'TEXT DEFAULT \'\'')]:
+                try:
+                    cursor.execute(f'ALTER TABLE players ADD COLUMN IF NOT EXISTS {col} {col_type}')
+                except:
+                    conn.rollback()
+        else:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS players (
+                    username TEXT PRIMARY KEY,
+                    password TEXT DEFAULT '',
+                    email TEXT DEFAULT '',
+                    money INTEGER DEFAULT 600,
+                    is_banned INTEGER DEFAULT 0,
+                    admin_message TEXT DEFAULT 'لا يوجد',
+                    avatar TEXT DEFAULT ''
+                );
+            ''')
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"⚠️ خطأ أثناء تهيئة قاعدة البيانات: {e}")
 
 init_db()
 
@@ -103,7 +109,6 @@ def send_code():
     except Exception as e:
         return jsonify({"status": "error", "message": f"خطأ بالسرفر: {str(e)}"}), 500
 
-# صفحة حظر وتأكيد الرمز اللوحة
 @app.route('/admin', methods=['GET', 'POST'])
 def admin_panel():
     if request.method == 'POST':
