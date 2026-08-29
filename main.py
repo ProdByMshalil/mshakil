@@ -72,7 +72,6 @@ def login():
     db = load_data()
     player = db["players"].get(username)
 
-    # فحص مرن ودقيق لاسم المستخدم وكلمة السر
     if not player or str(player.get("password", "")).strip() != password:
         return jsonify({"status": "error", "message": "اسم المستخدم أو كلمة السر غير صحيحة"}), 401
 
@@ -168,6 +167,7 @@ HTML_LAYOUT = """
 <body>
 <div class="container-fluid">
     <div class="row">
+        <!-- Main Content -->
         <div class="col-md-9 col-lg-9 p-4">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2><i class="fa-solid fa-gamepad accent-text me-2"></i> لوحة إدارة السيرفر</h2>
@@ -179,6 +179,7 @@ HTML_LAYOUT = """
                 </div>
             </div>
 
+            <!-- Stats -->
             <div class="row g-3 mb-4">
                 <div class="col-md-4">
                     <div class="card-custom p-3 text-center">
@@ -200,10 +201,12 @@ HTML_LAYOUT = """
                 </div>
             </div>
 
+            <!-- Search -->
             <div class="mb-3">
                 <input type="text" id="search-input" onkeyup="filterPlayers()" placeholder="🔍 ابحث عن لاعب بالاسم أو البريد..." class="form-control input-custom">
             </div>
 
+            <!-- Table -->
             <div class="card-custom p-3">
                 <h5 class="mb-3 accent-text"><i class="fa-solid fa-users-gear me-2"></i> إدارة حسابات اللاعبين</h5>
                 <div class="table-responsive">
@@ -282,13 +285,16 @@ HTML_LAYOUT = """
             </div>
         </div>
 
+        <!-- Sidebar Right -->
         <div class="col-md-3 col-lg-3 sidebar">
+            <!-- Clock -->
             <div class="card-custom p-3 mb-4 text-center">
                 <h6 class="text-muted mb-2"><i class="fa-regular fa-calendar-days text-info me-1"></i> التاريخ والوقت</h6>
                 <div id="live-clock" class="fs-5 fw-bold accent-text">--:--:--</div>
                 <small id="live-date" class="text-muted fw-bold"></small>
             </div>
 
+            <!-- Add Store Item -->
             <div class="card-custom p-3 mb-4">
                 <h6 class="accent-text mb-3"><i class="fa-solid fa-cart-plus me-1"></i> إضافة عنصر للمتجر عن بُعد</h6>
                 <form action="/admin/add_store_item" method="POST">
@@ -312,6 +318,7 @@ HTML_LAYOUT = """
                 </form>
             </div>
 
+            <!-- Current Store -->
             <div class="card-custom p-3">
                 <h6 class="text-muted mb-3 fw-bold"><i class="fa-solid fa-store me-1"></i> المتجر الحالي</h6>
                 <ul class="list-group list-group-flush bg-transparent">
@@ -431,4 +438,95 @@ def admin_dashboard():
 @app.route('/admin/update_player', methods=['POST'])
 def update_player():
     if not session.get('admin_logged'):
+        return redirect(url_for('admin_login'))
 
+    orig_uname = request.form.get('original_username')
+    new_uname = request.form.get('username', '').strip()
+    password = request.form.get('password', '').strip()
+    email = request.form.get('email', '').strip()
+    
+    money_amount = int(request.form.get('money_amount', 0))
+    money_action = request.form.get('money_action', 'add')
+    admin_msg = request.form.get('admin_message', '')
+
+    db = load_data()
+    if orig_uname in db["players"]:
+        player = db["players"].pop(orig_uname)
+        
+        current_money = player.get("money", 0)
+        if money_action == "add":
+            player["money"] = current_money + money_amount
+        elif money_action == "subtract":
+            player["money"] = max(0, current_money - money_amount)
+        elif money_action == "set":
+            if money_amount > 0 or request.form.get('money_amount') == '0':
+                player["money"] = money_amount
+
+        player["username"] = new_uname
+        if password:
+            player["password"] = password
+        player["email"] = email
+        player["admin_message"] = admin_msg
+        
+        db["players"][new_uname] = player
+        save_data(db)
+
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/toggle_ban/<username>')
+def toggle_ban(username):
+    if not session.get('admin_logged'):
+        return redirect(url_for('admin_login'))
+
+    db = load_data()
+    if username in db["players"]:
+        db["players"][username]["is_banned"] = 1 if db["players"][username].get("is_banned") == 0 else 0
+        save_data(db)
+
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/delete_player/<username>')
+def delete_player(username):
+    if not session.get('admin_logged'):
+        return redirect(url_for('admin_login'))
+
+    db = load_data()
+    if username in db["players"]:
+        del db["players"][username]
+        save_data(db)
+
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/add_store_item', methods=['POST'])
+def add_store_item():
+    if not session.get('admin_logged'):
+        return redirect(url_for('admin_login'))
+
+    item_id = request.form.get('item_id', '').strip()
+    item_name = request.form.get('item_name', '').strip()
+    price = int(request.form.get('price', 0))
+    icon = request.form.get('icon', '🔫').strip()
+
+    db = load_data()
+    if "store_items" not in db:
+        db["store_items"] = []
+
+    db["store_items"].append({
+        "id": item_id,
+        "name": item_name,
+        "price": price,
+        "icon": icon
+    })
+    save_data(db)
+
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/logout')
+def admin_logout():
+    if not session.get('admin_logged'):
+        return redirect(url_for('admin_login'))
+    session.pop('admin_logged', None)
+    return redirect(url_for('admin_login'))
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
