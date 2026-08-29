@@ -1,11 +1,13 @@
-from flask import Flask, request, jsonify, redirect, url_for
+from flask import Flask, request, jsonify, redirect, url_for, session
 import os
 import random
 import psycopg2
 import sqlite3
 
 app = Flask(__name__)
+app.secret_key = 'relic_curse_secret_key_ez9'
 
+ADMIN_CODE = "Prod_By_77"
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def get_db_connection():
@@ -65,7 +67,7 @@ def home():
         <meta charset="UTF-8">
         <title>عالم Relic Curse</title>
         <style>
-            body { background: #0b0c10; color: #fff; font-family: Tahoma; text-align: center; padding: 50px; }
+            body { background: #0b0c10; color: #fff; font-family: Tahoma, sans-serif; text-align: center; padding: 50px; }
             h1 { color: #00ffcc; }
             a { color: #ff00ff; font-size: 20px; text-decoration: none; border: 2px solid #ff00ff; padding: 10px 20px; border-radius: 8px; display: inline-block; margin-top: 20px; }
         </style>
@@ -78,7 +80,6 @@ def home():
     </html>
     '''
 
-# مسار إرسال رمز التحقق (يطبع الكود مباشرة في التيرمنال لسهولة الاستخدام)
 @app.route('/send-code', methods=['POST', 'GET'])
 def send_code():
     try:
@@ -90,7 +91,6 @@ def send_code():
             
         otp_code = str(random.randint(1000, 9999))
         
-        # طباعة الكود في شاشة السيرفر (التيرمنال) لكي تراه فوراً
         print(f"\n================================")
         print(f"🔑 [رمز التحقق OTP] للإيميل ({email}) هو: {otp_code}")
         print(f"================================\n")
@@ -98,14 +98,63 @@ def send_code():
         return jsonify({
             "status": "success",
             "message": "تم إرسال رمز التحقق بنجاح!",
-            "debug_code": otp_code # يرسل للعميل أيضاً كضمان للظهور الفوري
+            "debug_code": otp_code
         })
     except Exception as e:
         return jsonify({"status": "error", "message": f"خطأ بالسرفر: {str(e)}"}), 500
 
-# لوحة التحكم الكاملة للإمبراطور عزو
-@app.route('/admin', methods=['GET'])
+# صفحة حظر وتأكيد الرمز اللوحة
+@app.route('/admin', methods=['GET', 'POST'])
 def admin_panel():
+    if request.method == 'POST':
+        code = request.form.get('code', '').strip()
+        if code == ADMIN_CODE:
+            session['admin_logged'] = True
+            return redirect(url_for('admin_panel'))
+        else:
+            return '''
+            <!DOCTYPE html>
+            <html lang="ar" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body { background: #0b0c10; color: #ff0055; font-family: Tahoma; text-align: center; padding-top: 100px; }
+                    a { color: #00ffcc; text-decoration: none; font-size: 18px; display: block; margin-top: 20px; }
+                </style>
+            </head>
+            <body>
+                <h2>❌ رمز الدخول غير صحيح!</h2>
+                <a href="/admin">إعادة المحاولة</a>
+            </body>
+            </html>
+            '''
+
+    if not session.get('admin_logged'):
+        return '''
+        <!DOCTYPE html>
+        <html lang="ar" dir="rtl">
+        <head>
+            <meta charset="UTF-8">
+            <title>تأكيد الهوية - الإمبراطور</title>
+            <style>
+                body { background-color: #0b0c10; color: #fff; font-family: Tahoma; text-align: center; padding-top: 120px; }
+                .box { border: 2px solid #ff00ff; border-radius: 12px; padding: 30px; display: inline-block; background: #120124; box-shadow: 0 0 20px #ff00ff; }
+                input { padding: 10px; border-radius: 6px; border: 1px solid #00ffcc; background: #1a0236; color: #fff; text-align: center; font-size: 16px; margin-bottom: 15px; }
+                button { padding: 10px 25px; border: none; border-radius: 6px; background: #ff00ff; color: #fff; font-weight: bold; cursor: pointer; }
+            </style>
+        </head>
+        <body>
+            <div class="box">
+                <h2 style="color: #00ffcc;">👑 أدخل رمز الحماية للوحة التحكم</h2>
+                <form method="POST">
+                    <input type="password" name="code" placeholder="رمز الحماية" required><br>
+                    <button type="submit">دخول</button>
+                </form>
+            </div>
+        </body>
+        </html>
+        '''
+
     conn, db_type = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -126,27 +175,32 @@ def admin_panel():
         <meta charset="UTF-8">
         <title>لوحة تحكم الإمبراطور عزو</title>
         <style>
-            body { background-color: #0b0c10; color: #fff; font-family: Tahoma; text-align: center; padding: 20px; }
-            h1 { color: #00ffcc; text-shadow: 0 0 10px #00ffcc; }
-            .panel-container { border: 2px solid #ff00ff; border-radius: 15px; padding: 20px; max-width: 98%; margin: 0 auto; background-color: #120124; box-shadow: 0 0 15px #ff00ff; overflow-x: auto; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            th { color: #00ffff; padding: 12px; font-size: 13px; border-bottom: 2px solid #ff00ff; }
-            td { padding: 12px 8px; border-bottom: 1px solid #333; font-size: 13px; vertical-align: middle; }
-            .status-active { color: #00ff00; font-weight: bold; }
+            body { background-color: #05020a; color: #fff; font-family: Tahoma, sans-serif; text-align: center; padding: 20px; margin: 0; }
+            h1 { color: #00e5ff; text-shadow: 0 0 10px #00e5ff; margin-bottom: 25px; font-size: 24px; }
+            .panel-container { border: 2px solid #a800ff; border-radius: 15px; padding: 15px; max-width: 98%; margin: 0 auto; background-color: #0a0118; box-shadow: 0 0 20px rgba(168, 0, 255, 0.4); overflow-x: auto; }
+            table { width: 100%; border-collapse: collapse; }
+            th { color: #a800ff; padding: 12px 6px; font-size: 13px; border-bottom: 2px solid #a800ff; white-space: nowrap; }
+            td { padding: 10px 6px; border-bottom: 1px solid #1f083a; font-size: 12px; vertical-align: middle; }
+            
+            .player-cell { display: flex; align-items: center; justify-content: center; gap: 10px; }
+            .avatar-img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid #00e5ff; background: #111; }
+            
+            .status-active { color: #00ff66; font-weight: bold; }
             .status-banned { color: #ff0055; font-weight: bold; }
-            .msg-text { color: #ff00ff; }
+            .msg-text { color: #d870ff; }
             .pass-text { color: #ffcc00; font-family: monospace; }
-            .control-box { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; background: #1a0236; padding: 8px; border-radius: 8px; }
-            .input-val { background: #2d0b5a; border: 1px solid #ff00ff; color: #fff; padding: 5px; border-radius: 4px; width: 90px; text-align: center; font-size: 11px; }
-            .btn { padding: 5px 10px; border: none; border-radius: 4px; color: white; cursor: pointer; font-weight: bold; font-size: 11px; }
-            .btn-ban { background-color: #ff0055; }
-            .btn-unban { background-color: #00cc66; }
-            .btn-minus { background-color: #ff9900; }
-            .btn-plus { background-color: #00cccc; }
-            .btn-msg { background-color: #007bff; }
-            .btn-edit { background-color: #9900ff; }
-            .btn-del { background-color: #555; }
-            .avatar-img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #00ffcc; background: #222; }
+            
+            .ctrl-flex { display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: nowrap; }
+            .input-val { background: #180530; border: 1px solid #7700cc; color: #fff; padding: 6px; border-radius: 4px; width: 110px; text-align: center; font-size: 11px; }
+            
+            .btn { padding: 6px 10px; border: none; border-radius: 4px; color: white; cursor: pointer; font-weight: bold; font-size: 11px; white-space: nowrap; }
+            .btn-ban { background-color: #e6005c; }
+            .btn-unban { background-color: #00b359; }
+            .btn-minus { background-color: #ff8800; }
+            .btn-plus { background-color: #00c8c8; }
+            .btn-msg { background-color: #0066ff; }
+            .btn-del { background-color: #333344; border: 1px solid #555; }
+            .logout-btn { color: #ff3377; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 20px; font-size: 14px; }
         </style>
     </head>
     <body>
@@ -155,15 +209,13 @@ def admin_panel():
             <table>
                 <thead>
                     <tr>
-                        <th>الصورة</th>
                         <th>اللاعب</th>
-                        <th>كلمة المرور</th>
                         <th>البريد الإلكتروني</th>
-                        <th>الفلوس</th>
-                        <th>الحالة</th>
-                        <th>رسالة الإدارة</th>
-                        <th>تعديل البيانات</th>
-                        <th>التحكم الفوري</th>
+                        <th>كلمة المرور</th>
+                        <th>الفلوس الحالية</th>
+                        <th>حالة الحساب</th>
+                        <th>رسالة الإدارة له</th>
+                        <th>خيارات التحكم السريعة</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -175,53 +227,35 @@ def admin_panel():
         ban_btn_label = 'حظر' if is_banned == 0 else 'فك الحظر'
         ban_btn_class = 'btn-ban' if is_banned == 0 else 'btn-unban'
         
-        if avatar and avatar.strip() != '':
-            avatar_display = f'<img src="{avatar}" class="avatar-img" onerror="this.onerror=null; this.src=\'https://cdn-icons-png.flaticon.com/512/149/149071.png\';">'
-        else:
-            avatar_display = '<img src="https://cdn-icons-png.flaticon.com/512/149/149071.png" class="avatar-img">'
+        avatar_url = avatar if avatar and avatar.strip() != '' else 'https://cdn-icons-png.flaticon.com/512/149/149071.png'
         
         html += f'''
                     <tr>
-                        <td>{avatar_display}</td>
-                        <td><b>{username}</b></td>
-                        <td class="pass-text">{password}</td>
+                        <td>
+                            <div class="player-cell">
+                                <img src="{avatar_url}" class="avatar-img" onerror="this.onerror=null; this.src='https://cdn-icons-png.flaticon.com/512/149/149071.png';">
+                                <b>{username}</b>
+                            </div>
+                        </td>
                         <td>{email}</td>
+                        <td class="pass-text">{password}</td>
                         <td>{money} 💰</td>
                         <td>{status_str}</td>
                         <td class="msg-text">{admin_message}</td>
                         
                         <td>
-                            <form action="/quick_action" method="GET" style="display:flex; gap:4px; flex-direction:column;">
-                                <input type="hidden" name="action" value="update_profile">
-                                <input type="hidden" name="old_username" value="{username}">
-                                <input type="text" name="new_username" class="input-val" value="{username}" placeholder="الاسم" required>
-                                <input type="text" name="new_email" class="input-val" value="{email}" placeholder="الإيميل">
-                                <input type="text" name="new_password" class="input-val" value="{password}" placeholder="الباسورد">
-                                <input type="text" name="new_avatar" class="input-val" value="{avatar}" placeholder="رابط الصورة">
-                                <button type="submit" class="btn btn-edit">✏️ حفظ</button>
-                            </form>
-                        </td>
-
-                        <td>
-                            <div class="control-box">
+                            <div class="ctrl-flex">
                                 <button class="btn {ban_btn_class}" onclick="location.href='/quick_action?action=toggle_ban&username={username}'">{ban_btn_label}</button>
                                 
-                                <form action="/quick_action" method="GET" style="display:inline; margin:0;">
-                                    <input type="hidden" name="action" value="update_money">
+                                <form action="/quick_action" method="GET" style="display:flex; gap:3px; margin:0;">
                                     <input type="hidden" name="username" value="{username}">
-                                    <input type="number" name="amount" class="input-val" placeholder="المبلغ" required>
-                                    <button type="submit" name="sub_action" value="plus" class="btn btn-plus">+ زيادة</button>
-                                    <button type="submit" name="sub_action" value="minus" class="btn btn-minus">- خصم</button>
+                                    <input type="text" name="val_input" class="input-val" placeholder="المبلغ أو الرسالة">
+                                    <button type="submit" name="action" value="add_money" class="btn btn-plus">+ زيادة</button>
+                                    <button type="submit" name="action" value="sub_money" class="btn btn-minus">- نقصان</button>
+                                    <button type="submit" name="action" value="send_message" class="btn btn-msg">📧 إرسال رسالة</button>
                                 </form>
 
-                                <form action="/quick_action" method="GET" style="display:inline; margin:0;">
-                                    <input type="hidden" name="action" value="send_message">
-                                    <input type="hidden" name="username" value="{username}">
-                                    <input type="text" name="message" class="input-val" placeholder="الرسالة" required>
-                                    <button type="submit" class="btn btn-msg">📧 إرسال</button>
-                                </form>
-
-                                <button class="btn btn-del" onclick="if(confirm('هل أنت متأكد؟')) location.href='/quick_action?action=delete&username={username}'">❌ حذف</button>
+                                <button class="btn btn-del" onclick="if(confirm('هل أنت متأكد من حذف الحساب؟')) location.href='/quick_action?action=delete&username={username}'">❌ حذف</button>
                             </div>
                         </td>
                     </tr>
@@ -231,15 +265,25 @@ def admin_panel():
                 </tbody>
             </table>
         </div>
+        <a href="/admin_logout" class="logout-btn">🚪 تسجيل الخروج</a>
     </body>
     </html>
     '''
     return html
 
+@app.route('/admin_logout')
+def admin_logout():
+    session.pop('admin_logged', None)
+    return redirect(url_for('admin_panel'))
+
 @app.route('/quick_action', methods=['GET'])
 def quick_action():
+    if not session.get('admin_logged'):
+        return redirect(url_for('admin_panel'))
+
     action = request.args.get('action')
     username = request.args.get('username')
+    val_input = request.args.get('val_input', '').strip()
     
     conn, db_type = get_db_connection()
     cursor = conn.cursor()
@@ -250,26 +294,25 @@ def quick_action():
         else:
             cursor.execute('UPDATE players SET is_banned = 1 - is_banned WHERE username = ?', (username,))
     
-    elif action == 'update_money' and username:
-        amount = request.args.get('amount', type=int, default=0)
-        sub_action = request.args.get('sub_action')
-        if sub_action == 'plus':
-            if db_type == 'pg':
-                cursor.execute('UPDATE players SET money = money + %s WHERE username = %s', (amount, username))
-            else:
-                cursor.execute('UPDATE players SET money = money + ? WHERE username = ?', (amount, username))
-        elif sub_action == 'minus':
-            if db_type == 'pg':
-                cursor.execute('UPDATE players SET money = money - %s WHERE username = %s', (amount, username))
-            else:
-                cursor.execute('UPDATE players SET money = money - ? WHERE username = ?', (amount, username))
+    elif action == 'add_money' and username:
+        amount = int(val_input) if val_input.isdigit() else 0
+        if db_type == 'pg':
+            cursor.execute('UPDATE players SET money = money + %s WHERE username = %s', (amount, username))
+        else:
+            cursor.execute('UPDATE players SET money = money + ? WHERE username = ?', (amount, username))
+
+    elif action == 'sub_money' and username:
+        amount = int(val_input) if val_input.isdigit() else 0
+        if db_type == 'pg':
+            cursor.execute('UPDATE players SET money = money - %s WHERE username = %s', (amount, username))
+        else:
+            cursor.execute('UPDATE players SET money = money - ? WHERE username = ?', (amount, username))
             
     elif action == 'send_message' and username:
-        msg = request.args.get('message', default='')
         if db_type == 'pg':
-            cursor.execute('UPDATE players SET admin_message = %s WHERE username = %s', (msg, username))
+            cursor.execute('UPDATE players SET admin_message = %s WHERE username = %s', (val_input, username))
         else:
-            cursor.execute('UPDATE players SET admin_message = ? WHERE username = ?', (msg, username))
+            cursor.execute('UPDATE players SET admin_message = ? WHERE username = ?', (val_input, username))
         
     elif action == 'delete' and username:
         if db_type == 'pg':
@@ -277,25 +320,11 @@ def quick_action():
         else:
             cursor.execute('DELETE FROM players WHERE username = ?', (username,))
         
-    elif action == 'update_profile':
-        old_username = request.args.get('old_username')
-        new_username = request.args.get('new_username')
-        new_email = request.args.get('new_email', '')
-        new_password = request.args.get('new_password', '')
-        new_avatar = request.args.get('new_avatar', '')
-        
-        if old_username and new_username:
-            if db_type == 'pg':
-                cursor.execute('UPDATE players SET username = %s, email = %s, password = %s, avatar = %s WHERE username = %s', (new_username, new_email, new_password, new_avatar, old_username))
-            else:
-                cursor.execute('UPDATE players SET username = ?, email = ?, password = ?, avatar = ? WHERE username = ?', (new_username, new_email, new_password, new_avatar, old_username))
-        
     conn.commit()
     cursor.close()
     conn.close()
     return redirect(url_for('admin_panel'))
 
-# مسار تسجيل الدخول وجلب التحديثات للعبة (فلوس، حظر، رسائل)
 @app.route('/login', methods=['POST', 'GET'])
 def login():
     try:
@@ -326,7 +355,7 @@ def login():
                 "money": money,
                 "admin_message": admin_message,
                 "avatar": avatar,
-                "is_banned": is_banned # ترسل 0 لو نشط، و 1 لو محظور فوراً
+                "is_banned": is_banned
             })
         else:
             return jsonify({"status": "error", "message": "بيانات الدخول غير صحيحة!"})
