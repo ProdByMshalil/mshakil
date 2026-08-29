@@ -11,12 +11,21 @@ DATA_FILE = "players_data.json"
 # ══════════════════════════════════════════════════
 def load_data():
     if not os.path.exists(DATA_FILE):
-        return {"players": {}, "shop": [{"id": "AK-47", "name": "AK-47 🔫", "price": 500}, {"id": "Desert Eagle", "name": "Desert Eagle 💥", "price": 300}]}
+        return {
+            "players": {}, 
+            "shop": [
+                {"id": "AK-47", "name": "AK-47 🔫", "price": 500, "image": ""},
+                {"id": "Desert Eagle", "name": "Desert Eagle 💥", "price": 300, "image": ""}
+            ]
+        }
     try:
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
             if "shop" not in data:
-                data["shop"] = [{"id": "AK-47", "name": "AK-47 🔫", "price": 500}, {"id": "Desert Eagle", "name": "Desert Eagle 💥", "price": 300}]
+                data["shop"] = [
+                    {"id": "AK-47", "name": "AK-47 🔫", "price": 500, "image": ""},
+                    {"id": "Desert Eagle", "name": "Desert Eagle 💥", "price": 300, "image": ""}
+                ]
             return data
     except Exception:
         return {"players": {}, "shop": []}
@@ -113,7 +122,7 @@ def get_shop():
     return jsonify({"status": "success", "shop": db.get("shop", [])}), 200
 
 # ══════════════════════════════════════════════════
-# 🖥️ لوحة التحكم الأدمن الفخمة (الواجهة الأصلية)
+# 🖥️ لوحة التحكم الأدمن الفخمة
 # ══════════════════════════════════════════════════
 
 ADMIN_HTML = """
@@ -125,57 +134,79 @@ ADMIN_HTML = """
     <title>لوحة إدارة السيرفر</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background-color: #090c15; color: #e2e8f0; display: flex; min-height: 100vh; padding: 15px; gap: 15px; }
+        :root {
+            --bg-body: #090c15;
+            --bg-card: #111827;
+            --border-color: #1f2937;
+            --text-color: #e2e8f0;
+            --text-muted: #9ca3af;
+            --bg-input: #0b0f19;
+            --accent-green: #10b981;
+        }
+
+        body.light-mode {
+            --bg-body: #f1f5f9;
+            --bg-card: #ffffff;
+            --border-color: #cbd5e1;
+            --text-color: #0f172a;
+            --text-muted: #64748b;
+            --bg-input: #f8fafc;
+            --accent-green: #059669;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; transition: background 0.2s, color 0.2s; }
+        body { background-color: var(--bg-body); color: var(--text-color); display: flex; min-height: 100vh; padding: 15px; gap: 15px; }
         
-        /* Side Panel */
-        .sidebar { width: 300px; display: flex; flex-direction: column; gap: 15px; }
-        .card { background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 15px; }
+        /* Layout Structure */
+        .main-content { flex: 1; display: flex; flex-direction: column; gap: 15px; }
+        .sidebar-left { width: 320px; display: flex; flex-direction: column; gap: 15px; }
+        .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 15px; }
         
         .time-box { text-align: center; border-color: #064e3b; }
-        .time-title { color: #10b981; font-size: 13px; font-weight: bold; margin-bottom: 5px; }
-        .time-val { font-size: 20px; font-weight: bold; color: #10b981; }
-        .date-val { font-size: 12px; color: #9ca3af; margin-top: 3px; }
+        .time-title { color: var(--accent-green); font-size: 13px; font-weight: bold; margin-bottom: 5px; }
+        .time-val { font-size: 20px; font-weight: bold; color: var(--accent-green); }
+        .date-val { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
         
-        .form-title { color: #10b981; font-size: 14px; font-weight: bold; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .form-title { color: var(--accent-green); font-size: 14px; font-weight: bold; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
         .inp-group { margin-bottom: 10px; }
-        .inp-label { font-size: 11px; color: #9ca3af; margin-bottom: 4px; display: block; }
-        .sidebar input { width: 100%; background: #0b0f19; border: 1px solid #1f2937; color: #fff; padding: 8px 10px; border-radius: 6px; font-size: 12px; }
-        .btn-add-shop { width: 100%; background: #10b981; color: #000; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 5px; }
+        .inp-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: block; }
+        .sidebar-left input { width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-color); padding: 8px 10px; border-radius: 6px; font-size: 12px; }
+        .btn-add-shop { width: 100%; background: var(--accent-green); color: #fff; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 5px; }
         
-        .shop-list-title { font-size: 13px; color: #9ca3af; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
-        .shop-item { display: flex; justify-content: space-between; align-items: center; background: #0b0f19; padding: 8px 12px; border-radius: 6px; margin-bottom: 6px; }
+        .shop-list-title { font-size: 13px; color: var(--text-muted); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+        .shop-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg-input); padding: 8px 12px; border-radius: 6px; margin-bottom: 6px; border: 1px solid var(--border-color); }
+        .shop-item-left { display: flex; align-items: center; gap: 8px; }
+        .shop-img { width: 30px; height: 30px; border-radius: 4px; object-fit: cover; background: var(--border-color); }
         .shop-badge { background: #064e3b; color: #10b981; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-        
-        /* Main Panel */
-        .main-content { flex: 1; display: flex; flex-direction: column; gap: 15px; }
+        .btn-del-shop { background: #7f1d1d; color: #fff; border: none; width: 24px; height: 24px; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }
+
+        /* Top Bar */
         .top-bar { display: flex; justify-content: space-between; align-items: center; }
-        .main-title { font-size: 22px; font-weight: bold; color: #fff; display: flex; align-items: center; gap: 10px; }
-        .main-title span { color: #10b981; }
+        .main-title { font-size: 22px; font-weight: bold; color: var(--text-color); display: flex; align-items: center; gap: 10px; }
+        .main-title span { color: var(--accent-green); }
         .top-btns { display: flex; gap: 8px; }
-        .btn-top { background: #1f2937; border: 1px solid #374151; color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+        .btn-top { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-color); padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
         .btn-exit { background: #991b1b; color: #fff; border: none; }
         
         /* Stats */
         .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
-        .stat-card { background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 15px; text-align: center; }
-        .stat-label { font-size: 12px; color: #9ca3af; margin-bottom: 8px; }
-        .stat-num { font-size: 24px; font-weight: bold; color: #10b981; }
+        .stat-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 15px; text-align: center; }
+        .stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+        .stat-num { font-size: 24px; font-weight: bold; color: var(--accent-green); }
         .stat-num.red { color: #ef4444; }
         
-        /* Search */
-        .search-box input { width: 100%; background: #111827; border: 1px solid #1f2937; color: #fff; padding: 10px 15px; border-radius: 8px; font-size: 13px; }
+        /* Search & Table */
+        .search-box input { width: 100%; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-color); padding: 10px 15px; border-radius: 8px; font-size: 13px; }
         
-        /* Table */
-        .table-card { background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 15px; flex: 1; overflow-x: auto; }
-        .table-header { color: #10b981; font-size: 15px; font-weight: bold; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
-        table { width: 100%; border-collapse: collapse; min-width: 800px; }
-        th { color: #10b981; font-size: 12px; padding: 10px; text-align: center; border-bottom: 1px solid #1f2937; }
-        td { padding: 10px; text-align: center; border-bottom: 1px solid #111827; font-size: 13px; }
+        .table-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 15px; flex: 1; overflow-x: auto; }
+        .table-header { color: var(--accent-green); font-size: 15px; font-weight: bold; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+        table { width: 100%; border-collapse: collapse; min-width: 950px; }
+        th { color: var(--accent-green); font-size: 12px; padding: 10px; text-align: center; border-bottom: 1px solid var(--border-color); }
+        td { padding: 10px; text-align: center; border-bottom: 1px solid var(--border-color); font-size: 13px; }
         
-        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: #1f2937; display: inline-flex; align-items: center; justify-content: center; color: #10b981; }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--border-color); display: inline-flex; align-items: center; justify-content: center; color: var(--accent-green); }
         .money-badge { background: #fbbf24; color: #000; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; }
-        .weapons-text { font-size: 10px; color: #6b7280; display: block; margin-top: 2px; }
+        .weapons-text { font-size: 10px; color: var(--text-muted); display: block; margin-top: 2px; }
         
         .actions { display: flex; justify-content: center; gap: 4px; }
         .btn-act { width: 28px; height: 28px; border: none; border-radius: 4px; cursor: pointer; color: white; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }
@@ -183,58 +214,22 @@ ADMIN_HTML = """
         .btn-act.status-banned { background: #dc2626; }
         .btn-act.ban { background: #b91c1c; }
         .btn-act.delete { background: #7f1d1d; }
+        .btn-act.save-pass { background: #2563eb; }
         
-        .inp-tbl { background: #0b0f19; border: 1px solid #1f2937; color: #fff; padding: 4px 6px; border-radius: 4px; text-align: center; font-size: 12px; }
+        .inp-tbl { background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-color); padding: 4px 6px; border-radius: 4px; text-align: center; font-size: 12px; }
         .inp-money { width: 50px; }
-        .inp-msg { width: 110px; }
+        .inp-pass { width: 90px; }
+        .inp-msg { width: 100px; }
     </style>
 </head>
 <body>
-
-    <!-- Sidebar Left -->
-    <div class="sidebar">
-        <div class="card time-box">
-            <div class="time-title"><i class="far fa-calendar-alt"></i> التاريخ والوقت</div>
-            <div class="time-val" id="clock">--:--:--</div>
-            <div class="date-val" id="date">--</div>
-        </div>
-
-        <div class="card">
-            <div class="form-title"><i class="fas fa-cart-plus"></i> إضافة شيء للمتجر عن بُعد</div>
-            <form action="/admin/add_shop" method="POST">
-                <div class="inp-group">
-                    <label class="inp-label">معرف العنصر (ID)</label>
-                    <input type="text" name="shop_id" placeholder="مثال: M416" required>
-                </div>
-                <div class="inp-group">
-                    <label class="inp-label">اسم السلاح</label>
-                    <input type="text" name="shop_name" placeholder="مثال: سلاح M416" required>
-                </div>
-                <div class="inp-group">
-                    <label class="inp-label">السعر ($)</label>
-                    <input type="number" name="shop_price" placeholder="400" required>
-                </div>
-                <button type="submit" class="btn-add-shop">+ إضافة للمتجر</button>
-            </form>
-        </div>
-
-        <div class="card" style="flex:1;">
-            <div class="shop-list-title"><span><i class="fas fa-store"></i> المتجر الحالي</span></div>
-            {% for item in shop %}
-            <div class="shop-item">
-                <span class="shop-badge">${{ item.price }}</span>
-                <span>{{ item.name }}</span>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
 
     <!-- Main Content Right -->
     <div class="main-content">
         <div class="top-bar">
             <div class="main-title"><i class="fas fa-gamepad"></i> لوحة إدارة السيرفر</div>
             <div class="top-btns">
-                <button class="btn-top"><i class="fas fa-cog"></i> الوضع الفاتح</button>
+                <button class="btn-top" onclick="toggleTheme()"><i class="fas fa-adjust"></i> <span id="theme-text">الوضع الفاتح</span></button>
                 <button class="btn-top btn-exit"><i class="fas fa-sign-out-alt"></i> خروج</button>
             </div>
         </div>
@@ -257,18 +252,19 @@ ADMIN_HTML = """
 
         <!-- Search -->
         <div class="search-box">
-            <input type="text" placeholder="🔍 ابحث عن لاعب بالاسم أو البريد...">
+            <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="🔍 ابحث عن لاعب بالاسم أو البريد...">
         </div>
 
         <!-- Accounts Table -->
         <div class="table-card">
             <div class="table-header"><i class="fas fa-users-cog"></i> قائمة الحسابات والتعديل</div>
-            <table>
+            <table id="playersTable">
                 <thead>
                     <tr>
                         <th>الصورة</th>
                         <th>اسم المستخدم</th>
                         <th>البريد الإلكتروني</th>
+                        <th>كلمة السر</th>
                         <th>الرصيد الحالي</th>
                         <th>تعديل الفلوس</th>
                         <th>رسالة الإدارة</th>
@@ -284,6 +280,9 @@ ADMIN_HTML = """
                             <td><strong>{{ p.username }}</strong></td>
                             <td>{{ p.email or 'غ/م' }}</td>
                             <td>
+                                <input type="text" name="new_password" value="{{ p.password }}" class="inp-tbl inp-pass">
+                            </td>
+                            <td>
                                 <div class="money-badge">${{ p.money }}</div>
                                 <span class="weapons-text">الأسلحة: {{ (p.unlocked_weapons or []) | join(',') }}</span>
                             </td>
@@ -297,13 +296,13 @@ ADMIN_HTML = """
                             </td>
                             <td>
                                 <div class="actions">
+                                    <button type="submit" name="action" value="save_all" class="btn-act save-pass" title="حفظ كلمة السر والتعديلات"><i class="fas fa-save"></i></button>
                                     {% if p.is_banned %}
                                         <button type="submit" name="action" value="unban" class="btn-act status-banned" title="محظور">محظور</button>
                                     {% else %}
                                         <button type="submit" name="action" value="ban" class="btn-act status-active" title="نشط">نشط</button>
                                     {% endif %}
-                                    <button type="submit" name="action" value="ban" class="btn-act ban"><i class="fas fa-ban"></i></button>
-                                    <button type="submit" name="action" value="delete" class="btn-act delete"><i class="fas fa-trash"></i></button>
+                                    <button type="submit" name="action" value="delete" class="btn-act delete" title="حذف الحساب"><i class="fas fa-trash"></i></button>
                                 </div>
                             </td>
                         </form>
@@ -314,7 +313,70 @@ ADMIN_HTML = """
         </div>
     </div>
 
+    <!-- Sidebar Left (المتجر وإضافة الأسلحة على الشمال) -->
+    <div class="sidebar-left">
+        <div class="card time-box">
+            <div class="time-title"><i class="far fa-calendar-alt"></i> التاريخ والوقت</div>
+            <div class="time-val" id="clock">--:--:--</div>
+            <div class="date-val" id="date">--</div>
+        </div>
+
+        <div class="card">
+            <div class="form-title"><i class="fas fa-cart-plus"></i> إضافة شيء للمتجر عن بُعد</div>
+            <form action="/admin/add_shop" method="POST">
+                <div class="inp-group">
+                    <label class="inp-label">معرف العنصر (ID)</label>
+                    <input type="text" name="shop_id" placeholder="مثال: M416" required>
+                </div>
+                <div class="inp-group">
+                    <label class="inp-label">اسم السلاح</label>
+                    <input type="text" name="shop_name" placeholder="مثال: سلاح M416" required>
+                </div>
+                <div class="inp-group">
+                    <label class="inp-label">رابط الصورة (URL)</label>
+                    <input type="text" name="shop_image" placeholder="https://example.com/gun.png">
+                </div>
+                <div class="inp-group">
+                    <label class="inp-label">السعر ($)</label>
+                    <input type="number" name="shop_price" placeholder="400" required>
+                </div>
+                <button type="submit" class="btn-add-shop">+ إضافة للمتجر</button>
+            </form>
+        </div>
+
+        <div class="card" style="flex:1;">
+            <div class="shop-list-title"><span><i class="fas fa-store"></i> المتجر الحالي</span></div>
+            {% for item in shop %}
+            <div class="shop-item">
+                <div class="shop-item-left">
+                    {% if item.image %}
+                        <img src="{{ item.image }}" class="shop-img" alt="weapon">
+                    {% else %}
+                        <div class="shop-img" style="display:flex;align-items:center;justify-content:center;"><i class="fas fa-crosshairs" style="font-size:10px;"></i></div>
+                    {% endif %}
+                    <span>{{ item.name }}</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <span class="shop-badge">${{ item.price }}</span>
+                    <form action="/admin/delete_shop" method="POST" style="margin:0;">
+                        <input type="hidden" name="shop_id" value="{{ item.id }}">
+                        <button type="submit" class="btn-del-shop" title="حذف العنصر"><i class="fas fa-trash"></i></button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
     <script>
+        // التبديل بين الوضع المظلم والفاتح
+        function toggleTheme() {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            document.getElementById('theme-text').textContent = isLight ? 'الوضع الداكن' : 'الوضع الفاتح';
+        }
+
+        // الساعة والتاريخ
         function updateClock() {
             const now = new Date();
             const hours = String(now.getHours() % 12 || 12).padStart(2, '0');
@@ -328,6 +390,16 @@ ADMIN_HTML = """
         }
         setInterval(updateClock, 1000);
         updateClock();
+
+        // فلترة الجدول بالبحث السريع
+        function filterTable() {
+            const input = document.getElementById('searchInput').value.toLowerCase();
+            const rows = document.querySelectorAll('#playersTable tbody tr');
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(input) ? '' : 'none';
+            });
+        }
     </script>
 </body>
 </html>
@@ -357,12 +429,26 @@ def add_shop():
     s_id = request.form.get('shop_id')
     s_name = request.form.get('shop_name')
     s_price = request.form.get('shop_price')
+    s_image = request.form.get('shop_image', '')
 
     if s_id and s_name and s_price:
         db = load_data()
-        db["shop"].append({"id": s_id, "name": s_name, "price": int(s_price)})
+        db["shop"].append({
+            "id": s_id, 
+            "name": s_name, 
+            "price": int(s_price), 
+            "image": s_image
+        })
         save_data(db)
 
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/delete_shop', methods=['POST'])
+def delete_shop():
+    s_id = request.form.get('shop_id')
+    db = load_data()
+    db["shop"] = [item for item in db.get("shop", []) if item.get("id") != s_id]
+    save_data(db)
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/update_user', methods=['POST'])
@@ -371,6 +457,7 @@ def admin_update_user():
     action = request.form.get('action')
     money_change = int(request.form.get('money_change', 0))
     admin_msg = request.form.get('admin_message', '')
+    new_pass = request.form.get('new_password', '').strip()
 
     db = load_data()
     players = db.get("players", {})
@@ -378,6 +465,9 @@ def admin_update_user():
     if target in players:
         p = players[target]
         p["admin_message"] = admin_msg
+
+        if new_pass:
+            p["password"] = new_pass
 
         if action == "add_money":
             p["money"] = p.get("money", 0) + money_change
