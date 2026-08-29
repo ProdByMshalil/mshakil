@@ -11,8 +11,11 @@ DATA_FILE = "players_data.json"
 
 def load_data():
     if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
     return {
         "players": {},
         "store_items": [
@@ -39,11 +42,8 @@ def register():
     password = str(data.get('password', '')).strip()
     avatar = str(data.get('avatar', '')).strip()
 
-    # التحقق المباشر بدون تعقيد
-    if not username:
-        return jsonify({"status": "error", "message": "اسم المستخدم مطلوب"}), 400
-    if not password:
-        return jsonify({"status": "error", "message": "كلمة السر مطلوبة"}), 400
+    if not username or not password:
+        return jsonify({"status": "error", "message": "اسم المستخدم وكلمة السر مطلوبان"}), 400
 
     db = load_data()
     if username in db["players"]:
@@ -72,7 +72,8 @@ def login():
     db = load_data()
     player = db["players"].get(username)
 
-    if not player or str(player.get("password")) != password:
+    # فحص مرن ودقيق لاسم المستخدم وكلمة السر
+    if not player or str(player.get("password", "")).strip() != password:
         return jsonify({"status": "error", "message": "اسم المستخدم أو كلمة السر غير صحيحة"}), 401
 
     return jsonify({
@@ -167,12 +168,10 @@ HTML_LAYOUT = """
 <body>
 <div class="container-fluid">
     <div class="row">
-        <!-- Main Content -->
         <div class="col-md-9 col-lg-9 p-4">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2><i class="fa-solid fa-gamepad accent-text me-2"></i> لوحة إدارة السيرفر</h2>
                 <div class="d-flex gap-2 align-items-center">
-                    <!-- Toggle Dark/Light Mode Button -->
                     <button class="btn btn-outline-secondary btn-sm" onclick="toggleTheme()" id="theme-btn">
                         <i class="fa-solid fa-sun me-1"></i> الوضع الفاتح
                     </button>
@@ -180,7 +179,6 @@ HTML_LAYOUT = """
                 </div>
             </div>
 
-            <!-- Stats -->
             <div class="row g-3 mb-4">
                 <div class="col-md-4">
                     <div class="card-custom p-3 text-center">
@@ -202,20 +200,19 @@ HTML_LAYOUT = """
                 </div>
             </div>
 
-            <!-- Search -->
             <div class="mb-3">
                 <input type="text" id="search-input" onkeyup="filterPlayers()" placeholder="🔍 ابحث عن لاعب بالاسم أو البريد..." class="form-control input-custom">
             </div>
 
-            <!-- Table -->
             <div class="card-custom p-3">
-                <h5 class="mb-3 accent-text"><i class="fa-solid fa-users-gear me-2"></i> قائمة الحسابات والتعديل</h5>
+                <h5 class="mb-3 accent-text"><i class="fa-solid fa-users-gear me-2"></i> إدارة حسابات اللاعبين</h5>
                 <div class="table-responsive">
                     <table class="table table-custom align-middle" id="players-table">
                         <thead>
                             <tr>
                                 <th>الصورة</th>
                                 <th>اسم المستخدم</th>
+                                <th>كلمة السر</th>
                                 <th>البريد الإلكتروني</th>
                                 <th>الرصيد الحالي</th>
                                 <th>تعديل الفلوس</th>
@@ -236,10 +233,16 @@ HTML_LAYOUT = """
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <input type="text" name="username" value="{{ p.username }}" class="form-control form-control-sm input-custom fw-bold" style="min-width: 110px;">
+                                        <input type="text" name="username" value="{{ p.username }}" class="form-control form-control-sm input-custom fw-bold" style="min-width: 100px;">
                                     </td>
                                     <td>
-                                        <input type="text" name="email" value="{{ p.get('email', '') }}" class="form-control form-control-sm input-custom" style="min-width: 140px;">
+                                        <div class="input-group input-group-sm" style="min-width: 120px;">
+                                            <input type="password" name="password" id="pass-{{ loop.index }}" value="{{ p.get('password', '') }}" class="form-control input-custom">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="togglePass('pass-{{ loop.index }}')"><i class="fa-solid fa-eye"></i></button>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="text" name="email" value="{{ p.get('email', '') }}" class="form-control form-control-sm input-custom" style="min-width: 130px;">
                                     </td>
                                     <td>
                                         <span class="badge bg-warning text-dark fs-6">${{ p.get('money', 0) }}</span>
@@ -247,8 +250,8 @@ HTML_LAYOUT = """
                                     </td>
                                     <td>
                                         <div class="d-flex gap-1">
-                                            <input type="number" name="money_amount" value="0" min="0" class="form-control form-control-sm input-custom" style="width: 75px;">
-                                            <select name="money_action" class="form-select form-select-sm input-custom" style="width: 85px;">
+                                            <input type="number" name="money_amount" value="0" min="0" class="form-control form-control-sm input-custom" style="width: 70px;">
+                                            <select name="money_action" class="form-select form-select-sm input-custom" style="width: 80px;">
                                                 <option value="add">➕ إضافة</option>
                                                 <option value="subtract">➖ خصم</option>
                                                 <option value="set">🎯 تعيين</option>
@@ -256,7 +259,7 @@ HTML_LAYOUT = """
                                         </div>
                                     </td>
                                     <td>
-                                        <input type="text" name="admin_message" value="{{ p.get('admin_message', '') }}" placeholder="رسالة تنبيه..." class="form-control form-control-sm input-custom" style="min-width: 120px;">
+                                        <input type="text" name="admin_message" value="{{ p.get('admin_message', '') }}" placeholder="رسالة تنبيه..." class="form-control form-control-sm input-custom" style="min-width: 110px;">
                                     </td>
                                     <td>
                                         <div class="d-flex align-items-center gap-1">
@@ -279,18 +282,15 @@ HTML_LAYOUT = """
             </div>
         </div>
 
-        <!-- Sidebar Right -->
         <div class="col-md-3 col-lg-3 sidebar">
-            <!-- Clock -->
             <div class="card-custom p-3 mb-4 text-center">
                 <h6 class="text-muted mb-2"><i class="fa-regular fa-calendar-days text-info me-1"></i> التاريخ والوقت</h6>
                 <div id="live-clock" class="fs-5 fw-bold accent-text">--:--:--</div>
                 <small id="live-date" class="text-muted fw-bold"></small>
             </div>
 
-            <!-- Add Store Item -->
             <div class="card-custom p-3 mb-4">
-                <h6 class="accent-text mb-3"><i class="fa-solid fa-cart-plus me-1"></i> إضافة شيء للمتجر عن بُعد</h6>
+                <h6 class="accent-text mb-3"><i class="fa-solid fa-cart-plus me-1"></i> إضافة عنصر للمتجر عن بُعد</h6>
                 <form action="/admin/add_store_item" method="POST">
                     <div class="mb-2">
                         <label class="form-label small text-muted fw-bold">معرّف العنصر (ID)</label>
@@ -312,7 +312,6 @@ HTML_LAYOUT = """
                 </form>
             </div>
 
-            <!-- Current Store -->
             <div class="card-custom p-3">
                 <h6 class="text-muted mb-3 fw-bold"><i class="fa-solid fa-store me-1"></i> المتجر الحالي</h6>
                 <ul class="list-group list-group-flush bg-transparent">
@@ -358,6 +357,11 @@ HTML_LAYOUT = """
         } else {
             btn.innerHTML = '<i class="fa-solid fa-sun me-1"></i> الوضع الفاتح';
         }
+    }
+
+    function togglePass(id) {
+        const input = document.getElementById(id);
+        input.type = input.type === 'password' ? 'text' : 'password';
     }
 </script>
 </body>
@@ -426,91 +430,4 @@ def admin_dashboard():
 
 @app.route('/admin/update_player', methods=['POST'])
 def update_player():
-    if not session.get('admin_logged'):
-        return redirect(url_for('admin_login'))
-
-    orig_uname = request.form.get('original_username')
-    new_uname = request.form.get('username', '').strip()
-    email = request.form.get('email', '').strip()
-    
-    money_amount = int(request.form.get('money_amount', 0))
-    money_action = request.form.get('money_action', 'add')
-    admin_msg = request.form.get('admin_message', '')
-
-    db = load_data()
-    if orig_uname in db["players"]:
-        player = db["players"].pop(orig_uname)
-        
-        current_money = player.get("money", 0)
-        if money_action == "add":
-            player["money"] = current_money + money_amount
-        elif money_action == "subtract":
-            player["money"] = max(0, current_money - money_amount)
-        elif money_action == "set":
-            if money_amount > 0 or request.form.get('money_amount') == '0':
-                player["money"] = money_amount
-
-        player["username"] = new_uname
-        player["email"] = email
-        player["admin_message"] = admin_msg
-        
-        db["players"][new_uname] = player
-        save_data(db)
-
-    return redirect(url_for('admin_dashboard'))
-
-@app.route('/admin/toggle_ban/<username>')
-def toggle_ban(username):
-    if not session.get('admin_logged'):
-        return redirect(url_for('admin_login'))
-
-    db = load_data()
-    if username in db["players"]:
-        db["players"][username]["is_banned"] = 1 if db["players"][username].get("is_banned") == 0 else 0
-        save_data(db)
-
-    return redirect(url_for('admin_dashboard'))
-
-@app.route('/admin/delete_player/<username>')
-def delete_player(username):
-    if not session.get('admin_logged'):
-        return redirect(url_for('admin_login'))
-
-    db = load_data()
-    if username in db["players"]:
-        del db["players"][username]
-        save_data(db)
-
-    return redirect(url_for('admin_dashboard'))
-
-@app.route('/admin/add_store_item', methods=['POST'])
-def add_store_item():
-    if not session.get('admin_logged'):
-        return redirect(url_for('admin_login'))
-
-    item_id = request.form.get('item_id', '').strip()
-    item_name = request.form.get('item_name', '').strip()
-    price = int(request.form.get('price', 0))
-    icon = request.form.get('icon', '🔫').strip()
-
-    db = load_data()
-    if "store_items" not in db:
-        db["store_items"] = []
-
-    db["store_items"].append({
-        "id": item_id,
-        "name": item_name,
-        "price": price,
-        "icon": icon
-    })
-    save_data(db)
-
-    return redirect(url_for('admin_dashboard'))
-
-@app.route('/admin/logout')
-def admin_logout():
-    session.pop('admin_logged', None)
-    return redirect(url_for('admin_login'))
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    if not session.get('admin_
