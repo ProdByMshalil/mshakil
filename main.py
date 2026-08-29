@@ -121,6 +121,61 @@ def get_shop():
     db = load_data()
     return jsonify({"status": "success", "shop": db.get("shop", [])}), 200
 
+
+@app.route('/buy_item', methods=['POST'])
+def buy_item():
+    data = request.json or {}
+    username = str(data.get('username', '')).strip()
+    item_id = str(data.get('item_id', '')).strip()
+
+    if not username or not item_id:
+        return jsonify({"status": "error", "message": "بيانات غير مكتملة"}), 400
+
+    db = load_data()
+    players = db.get("players", {})
+    shop = db.get("shop", [])
+
+    # البحث عن اللاعب
+    player = None
+    for p_name, p_data in players.items():
+        if p_name.lower() == username.lower():
+            player = p_data
+            break
+
+    if not player:
+        return jsonify({"status": "error", "message": "اللاعب غير موجود"}), 404
+
+    # البحث عن السلاح في المتجر
+    item = next((i for i in shop if i["id"] == item_id), None)
+    if not item:
+        return jsonify({"status": "error", "message": "العنصر غير موجود في المتجر"}), 404
+
+    price = item["price"]
+
+    # التأكد من كفاية الرصيد
+    if player.get("money", 0) < price:
+        return jsonify({"status": "error", "message": "رصيدك غير كافٍ للشراء"}), 400
+
+    # خصم المبلغ وإضافة السلاح للحساب
+    player["money"] -= price
+    
+    if "unlocked_weapons" not in player:
+        player["unlocked_weapons"] = ["PISTOL"]
+        
+    if item_id not in player["unlocked_weapons"]:
+        player["unlocked_weapons"].append(item_id)
+
+    # حفظ التعديلات نهائياً
+    db["players"][player["username"]] = player
+    save_data(db)
+
+    return jsonify({
+        "status": "success",
+        "message": "تم الشراء بنجاح",
+        "new_money": player["money"],
+        "unlocked_weapons": player["unlocked_weapons"]
+    }), 200
+
 # ══════════════════════════════════════════════════
 # 🖥️ لوحة التحكم الأدمن الفخمة
 # ══════════════════════════════════════════════════
@@ -313,7 +368,7 @@ ADMIN_HTML = """
         </div>
     </div>
 
-    <!-- Sidebar Left (المتجر وإضافة الأسلحة على الشمال) -->
+    <!-- Sidebar Left (المتجر على اليسار) -->
     <div class="sidebar-left">
         <div class="card time-box">
             <div class="time-title"><i class="far fa-calendar-alt"></i> التاريخ والوقت</div>
@@ -369,14 +424,12 @@ ADMIN_HTML = """
     </div>
 
     <script>
-        // التبديل بين الوضع المظلم والفاتح
         function toggleTheme() {
             document.body.classList.toggle('light-mode');
             const isLight = document.body.classList.contains('light-mode');
             document.getElementById('theme-text').textContent = isLight ? 'الوضع الداكن' : 'الوضع الفاتح';
         }
 
-        // الساعة والتاريخ
         function updateClock() {
             const now = new Date();
             const hours = String(now.getHours() % 12 || 12).padStart(2, '0');
@@ -391,7 +444,6 @@ ADMIN_HTML = """
         setInterval(updateClock, 1000);
         updateClock();
 
-        // فلترة الجدول بالبحث السريع
         function filterTable() {
             const input = document.getElementById('searchInput').value.toLowerCase();
             const rows = document.querySelectorAll('#playersTable tbody tr');
