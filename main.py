@@ -6,7 +6,7 @@ app = Flask(__name__)
 DATA_FILE = "players_data.json"
 
 # ══════════════════════════════════════════════════
-# 💾 إدارة البيانات (JSON Storage)
+# 💾 إدارة البيانات
 # ══════════════════════════════════════════════════
 def load_data():
     if not os.path.exists(DATA_FILE):
@@ -22,10 +22,9 @@ def save_data(data):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 # ══════════════════════════════════════════════════
-# ⚡ Endpoints الخاصة بـ Godot API
+# ⚡ الـ Endpoints الخاصة بـ API
 # ══════════════════════════════════════════════════
 
-# 1. إنشاء حساب جديد
 @app.route('/register', methods=['POST'])
 def register():
     data = request.json or {}
@@ -61,7 +60,7 @@ def register():
 
     return jsonify({"status": "success", "message": "تم إنشاء الحساب بنجاح"}), 201
 
-# 2. تسجيل الدخول
+
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json or {}
@@ -103,7 +102,7 @@ def login():
         "unlocked_weapons": found_player.get("unlocked_weapons", ["Pistol"])
     }), 200
 
-# 3. جلب بيانات لاعب محدد
+
 @app.route('/get_player/<username>', methods=['GET'])
 def get_player(username):
     db = load_data()
@@ -115,7 +114,7 @@ def get_player(username):
             
     return jsonify({"status": "error", "message": "اللاعب غير موجود"}), 404
 
-# 4. تحديث بيانات اللاعب من داخل اللعبة (المال، الأسلحة، السكور)
+
 @app.route('/update_player', methods=['POST'])
 def update_player():
     data = request.json or {}
@@ -137,7 +136,6 @@ def update_player():
     if player.get("is_banned", 0) == 1:
         return jsonify({"status": "error", "message": "الحساب محظور", "is_banned": 1}), 403
 
-    # تحديث القيم لو أرسلت من جودوت
     if "money" in data:
         player["money"] = int(data["money"])
     if "score" in data:
@@ -150,7 +148,7 @@ def update_player():
 
 
 # ══════════════════════════════════════════════════
-# 🖥️ لوحة التحكم الأدمن المتكاملة (Web Admin Dashboard)
+# 🖥️ لوحة التحكم الأدمن التفاعلية (HTML)
 # ══════════════════════════════════════════════════
 ADMIN_HTML = """
 <!DOCTYPE html>
@@ -160,29 +158,32 @@ ADMIN_HTML = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>لوحة إدارة مشروع اللعبة</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background-color: #0f172a; color: #f8fafc; padding: 30px; }
-        h1 { margin-bottom: 20px; color: #38bdf8; text-align: center; }
-        .table-container { overflow-x: auto; background: #1e293b; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 14px 10px; border-bottom: 1px solid #334155; text-align: center; }
-        th { background-color: #0f172a; color: #94a3b8; }
-        input[type="number"], input[type="text"] { background: #0f172a; border: 1px solid #475569; color: #fff; padding: 6px 10px; border-radius: 6px; width: 90px; text-align: center; }
-        .btn { padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        .btn-update { background-color: #0284c7; color: white; }
-        .btn-update:hover { background-color: #0369a1; }
-        .btn-ban { background-color: #ef4444; color: white; }
-        .btn-ban:hover { background-color: #dc2626; }
-        .btn-unban { background-color: #22c55e; color: white; }
-        .btn-unban:hover { background-color: #16a34a; }
-        .banned-row { background-color: rgba(239, 68, 68, 0.1); }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { background-color: #0b132b; color: #ffffff; padding: 20px; }
+        h1 { text-align: center; margin: 25px 0; color: #4cc9f0; font-size: 26px; }
+        .card { background: #1c2541; border-radius: 12px; padding: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.4); max-width: 1200px; margin: 0 auto; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 900px; }
+        th, td { padding: 12px 8px; text-align: center; border-bottom: 1px solid #3a506b; font-size: 14px; }
+        th { background: #0b132b; color: #4cc9f0; font-weight: 600; }
+        input[type="number"], input[type="text"] { background: #0b132b; border: 1px solid #3a506b; color: #fff; padding: 6px 8px; border-radius: 6px; text-align: center; font-size: 13px; }
+        .inp-sm { width: 75px; }
+        .inp-md { width: 120px; }
+        .btn { padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s; color: white; }
+        .btn-save { background: #3a86ff; }
+        .btn-save:hover { background: #2563eb; }
+        .btn-ban { background: #e63946; }
+        .btn-ban:hover { background: #d62828; }
+        .btn-unban { background: #38b000; }
+        .btn-unban:hover { background: #2b9348; }
+        .banned-row { background: rgba(230, 57, 70, 0.15); }
+        .empty-msg { text-align: center; padding: 30px; color: #8d99ae; font-size: 16px; }
     </style>
 </head>
 <body>
 
     <h1>🎮 لوحة تحكم سيرفر اللعبة</h1>
 
-    <div class="table-container">
+    <div class="card">
         <table>
             <thead>
                 <tr>
@@ -198,30 +199,36 @@ ADMIN_HTML = """
                 </tr>
             </thead>
             <tbody>
-                {% for uname, p in players.items() %}
-                <tr class="{{ 'banned-row' if p.is_banned else '' }}">
-                    <form action="/admin/update_user" method="POST">
-                        <input type="hidden" name="target_username" value="{{ p.username }}">
-                        <td><strong>{{ p.username }}</strong></td>
-                        <td>{{ p.email or 'غ/م' }}</td>
-                        <td><code>{{ p.password }}</code></td>
-                        <td><input type="number" name="money" value="{{ p.money }}"></td>
-                        <td><input type="number" name="score" value="{{ p.score or 0 }}"></td>
-                        <td><input type="text" name="weapons" value="{{ p.unlocked_weapons | join(',') }}" style="width: 140px;"></td>
-                        <td><input type="text" name="admin_message" value="{{ p.admin_message or '' }}" placeholder="سبب الحظر" style="width: 120px;"></td>
-                        <td>
-                            {% if p.is_banned %}
-                                <button type="submit" name="action" value="unban" class="btn btn-unban">فك الحظر</button>
-                            {% else %}
-                                <button type="submit" name="action" value="ban" class="btn btn-ban">حظر</button>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <button type="submit" name="action" value="save" class="btn btn-update">حفظ 💾</button>
-                        </td>
-                    </form>
-                </tr>
-                {% endfor %}
+                {% if players %}
+                    {% for uname, p in players.items() %}
+                    <tr class="{{ 'banned-row' if p.is_banned else '' }}">
+                        <form action="/admin/update_user" method="POST">
+                            <input type="hidden" name="target_username" value="{{ p.username }}">
+                            <td><strong>{{ p.username }}</strong></td>
+                            <td>{{ p.email or 'غ/م' }}</td>
+                            <td><code>{{ p.password }}</code></td>
+                            <td><input type="number" name="money" value="{{ p.money }}" class="inp-sm"></td>
+                            <td><input type="number" name="score" value="{{ p.score or 0 }}" class="inp-sm"></td>
+                            <td><input type="text" name="weapons" value="{{ (p.unlocked_weapons or []) | join(',') }}" class="inp-md"></td>
+                            <td><input type="text" name="admin_message" value="{{ p.admin_message or '' }}" placeholder="سبب الحظر" class="inp-md"></td>
+                            <td>
+                                {% if p.is_banned %}
+                                    <button type="submit" name="action" value="unban" class="btn btn-unban">فك الحظر</button>
+                                {% else %}
+                                    <button type="submit" name="action" value="ban" class="btn btn-ban">حظر</button>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button type="submit" name="action" value="save" class="btn btn-save">حفظ 💾</button>
+                            </td>
+                        </form>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="9" class="empty-msg">لا يوجد لاعبين مسجلين في قاعدة البيانات حتى الآن. قم بإنشاء حساب من اللعبة أولاً!</td>
+                    </tr>
+                {% endif %}
             </tbody>
         </table>
     </div>
@@ -234,6 +241,7 @@ ADMIN_HTML = """
 def admin_panel():
     db = load_data()
     return render_template_string(ADMIN_HTML, players=db.get("players", {}))
+
 
 @app.route('/admin/update_user', methods=['POST'])
 def admin_update_user():
@@ -249,8 +257,11 @@ def admin_update_user():
 
     if target in players:
         p = players[target]
-        if money: p["money"] = int(money)
-        if score: p["score"] = int(score)
+        if money is not None and money != '':
+            p["money"] = int(money)
+        if score is not None and score != '':
+            p["score"] = int(score)
+            
         if weapons_raw:
             p["unlocked_weapons"] = [w.strip() for w in weapons_raw.split(',') if w.strip()]
         
@@ -264,6 +275,7 @@ def admin_update_user():
         save_data(db)
 
     return redirect(url_for('admin_panel'))
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
