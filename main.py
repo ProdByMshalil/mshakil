@@ -6,10 +6,7 @@ import os
 app = Flask(__name__)
 app.secret_key = "ez9_super_secret_admin_key"
 
-# كلمة سر لوحة التحكم
 ADMIN_PASSWORD = "admin"
-
-# ملف التخزين المحلي للبانات
 DATA_FILE = "players_data.json"
 
 def load_data():
@@ -30,16 +27,23 @@ def save_data(data):
 
 # ==================== API GAME ENDPOINTS ====================
 
+@app.route('/')
+def home():
+    return redirect(url_for('admin_login'))
+
 @app.route('/register', methods=['POST'])
 def register():
     data = request.json or {}
-    username = data.get('username', '').strip()
-    email = data.get('email', '').strip()
-    password = data.get('password', '')
-    avatar = data.get('avatar', '')
+    username = str(data.get('username', '')).strip()
+    email = str(data.get('email', '')).strip()
+    password = str(data.get('password', '')).strip()
+    avatar = str(data.get('avatar', '')).strip()
 
-    if not username or not password:
-        return jsonify({"status": "error", "message": "اسم المستخدم وكلمة السر مطلوبان"}), 400
+    # التحقق المباشر بدون تعقيد
+    if not username:
+        return jsonify({"status": "error", "message": "اسم المستخدم مطلوب"}), 400
+    if not password:
+        return jsonify({"status": "error", "message": "كلمة السر مطلوبة"}), 400
 
     db = load_data()
     if username in db["players"]:
@@ -47,7 +51,7 @@ def register():
 
     db["players"][username] = {
         "username": username,
-        "email": email,
+        "email": email if email else "لا يوجد بريد",
         "password": password,
         "money": 1000,
         "avatar": avatar,
@@ -62,13 +66,13 @@ def register():
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json or {}
-    username = data.get('username', '').strip()
-    password = data.get('password', '')
+    username = str(data.get('username', '')).strip()
+    password = str(data.get('password', '')).strip()
 
     db = load_data()
     player = db["players"].get(username)
 
-    if not player or player.get("password") != password:
+    if not player or str(player.get("password")) != password:
         return jsonify({"status": "error", "message": "اسم المستخدم أو كلمة السر غير صحيحة"}), 401
 
     return jsonify({
@@ -81,12 +85,11 @@ def login():
         "unlocked_weapons": player.get("unlocked_weapons", [])
     }), 200
 
-# 🛒 API شراء سلاح من داخل جودوت (يخصم الفلوس فوراً)
 @app.route('/buy_weapon', methods=['POST'])
 def buy_weapon():
     data = request.json or {}
-    username = data.get('username', '').strip()
-    item_id = data.get('item_id', '').strip()
+    username = str(data.get('username', '')).strip()
+    item_id = str(data.get('item_id', '')).strip()
     price = int(data.get('price', 0))
 
     db = load_data()
@@ -118,78 +121,106 @@ def buy_weapon():
 
 HTML_LAYOUT = """
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <title>لوحة تحكم السيرفر - EZ9 Gaming</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { background-color: #0b0e14; color: #e1e6ed; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .sidebar { background: #121721; min-height: 100vh; border-left: 1px solid #1f293d; padding: 20px; }
-        .card-custom { background: #151c28; border: 1px solid #222d42; border-radius: 12px; }
-        .neon-text { color: #00ffaa; text-shadow: 0 0 10px rgba(0,255,170,0.3); }
-        .btn-neon { background: #00ffaa; color: #000; font-weight: bold; border: none; }
-        .btn-neon:hover { background: #00cc88; color: #000; }
-        .table-dark-custom { background: #151c28; color: #fff; }
-        .table-dark-custom th { background: #1c2536; color: #00ffaa; border-bottom: 2px solid #2a374e; }
-        .table-dark-custom td { border-bottom: 1px solid #222d42; vertical-align: middle; }
-        .input-dark { background: #0b0e14; border: 1px solid #2a374e; color: #fff; }
-        .input-dark:focus { background: #0f141f; color: #fff; border-color: #00ffaa; box-shadow: none; }
-        .avatar-img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #00ffaa; }
+        :root[data-bs-theme="dark"] {
+            --bg-body: #0b0e14;
+            --bg-card: #151c28;
+            --bg-sidebar: #121721;
+            --text-color: #f1f5f9;
+            --border-color: #222d42;
+            --input-bg: #0b0e14;
+            --accent-color: #00ffaa;
+        }
+
+        :root[data-bs-theme="light"] {
+            --bg-body: #f8f9fa;
+            --bg-card: #ffffff;
+            --bg-sidebar: #e9ecef;
+            --text-color: #1a202c;
+            --border-color: #cbd5e1;
+            --input-bg: #ffffff;
+            --accent-color: #00875a;
+        }
+
+        body { background-color: var(--bg-body); color: var(--text-color); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; transition: all 0.3s ease; }
+        .sidebar { background: var(--bg-sidebar); min-height: 100vh; border-left: 1px solid var(--border-color); padding: 20px; }
+        .card-custom { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .accent-text { color: var(--accent-color); font-weight: bold; }
+        .btn-accent { background: var(--accent-color); color: #000; font-weight: bold; border: none; }
+        .btn-accent:hover { opacity: 0.9; color: #000; }
+        
+        .table-custom { background: var(--bg-card); color: var(--text-color); }
+        .table-custom th { background: var(--bg-sidebar); color: var(--accent-color); border-bottom: 2px solid var(--border-color); }
+        .table-custom td { border-bottom: 1px solid var(--border-color); vertical-align: middle; color: var(--text-color); }
+        
+        .input-custom { background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-color) !important; }
+        .input-custom:focus { border-color: var(--accent-color); box-shadow: none; }
+        .avatar-img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-color); }
     </style>
 </head>
 <body>
 <div class="container-fluid">
     <div class="row">
-        <!-- Dashboard Main Content -->
+        <!-- Main Content -->
         <div class="col-md-9 col-lg-9 p-4">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2><i class="fa-solid fa-gamepad neon-text me-2"></i> لوحة إدارة السيرفر وحسابات اللاعبين</h2>
-                <a href="/admin/logout" class="btn btn-outline-danger btn-sm"><i class="fa-solid fa-right-from-bracket"></i> خروج</a>
+                <h2><i class="fa-solid fa-gamepad accent-text me-2"></i> لوحة إدارة السيرفر</h2>
+                <div class="d-flex gap-2 align-items-center">
+                    <!-- Toggle Dark/Light Mode Button -->
+                    <button class="btn btn-outline-secondary btn-sm" onclick="toggleTheme()" id="theme-btn">
+                        <i class="fa-solid fa-sun me-1"></i> الوضع الفاتح
+                    </button>
+                    <a href="/admin/logout" class="btn btn-outline-danger btn-sm"><i class="fa-solid fa-right-from-bracket"></i> خروج</a>
+                </div>
             </div>
 
-            <!-- Stats Row -->
+            <!-- Stats -->
             <div class="row g-3 mb-4">
                 <div class="col-md-4">
                     <div class="card-custom p-3 text-center">
-                        <small class="text-muted">إجمالي اللاعبين</small>
-                        <h3 class="neon-text mt-1">{{ total_players }}</h3>
+                        <small class="text-muted fw-bold">إجمالي اللاعبين</small>
+                        <h3 class="accent-text mt-1">{{ total_players }}</h3>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="card-custom p-3 text-center">
-                        <small class="text-muted">إجمالي أموال اللعبة</small>
+                        <small class="text-muted fw-bold">إجمالي أموال اللعبة</small>
                         <h3 class="text-warning mt-1">${{ total_money }}</h3>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="card-custom p-3 text-center">
-                        <small class="text-muted">الحسابات المحظورة</small>
+                        <small class="text-muted fw-bold">الحسابات المحظورة</small>
                         <h3 class="text-danger mt-1">{{ banned_players }}</h3>
                     </div>
                 </div>
             </div>
 
-            <!-- Search Bar -->
+            <!-- Search -->
             <div class="mb-3">
-                <input type="text" id="search-input" onkeyup="filterPlayers()" placeholder="🔍 ابحث عن لاعب بالاسم أو البريد..." class="form-control input-dark">
+                <input type="text" id="search-input" onkeyup="filterPlayers()" placeholder="🔍 ابحث عن لاعب بالاسم أو البريد..." class="form-control input-custom">
             </div>
 
-            <!-- Players Management Table -->
+            <!-- Table -->
             <div class="card-custom p-3">
-                <h5 class="mb-3 neon-text"><i class="fa-solid fa-users-gear me-2"></i> قائمة حسابات اللاعبين والتعديل</h5>
+                <h5 class="mb-3 accent-text"><i class="fa-solid fa-users-gear me-2"></i> قائمة الحسابات والتعديل</h5>
                 <div class="table-responsive">
-                    <table class="table table-dark-custom align-middle" id="players-table">
+                    <table class="table table-custom align-middle" id="players-table">
                         <thead>
                             <tr>
                                 <th>الصورة</th>
                                 <th>اسم المستخدم</th>
                                 <th>البريد الإلكتروني</th>
                                 <th>الرصيد الحالي</th>
-                                <th>تعديل الفلوس (مبلغ + نوع)</th>
+                                <th>تعديل الفلوس</th>
                                 <th>رسالة الإدارة</th>
-                                <th>الحالة / إجراءات</th>
+                                <th>إجراءات</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -201,14 +232,14 @@ HTML_LAYOUT = """
                                         {% if p.avatar %}
                                             <img src="{{ p.avatar }}" class="avatar-img">
                                         {% else %}
-                                            <div class="avatar-img bg-secondary text-center lh-lg">👤</div>
+                                            <div class="avatar-img bg-secondary text-white text-center lh-lg">👤</div>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <input type="text" name="username" value="{{ p.username }}" class="form-control form-control-sm input-dark" style="min-width: 110px;">
+                                        <input type="text" name="username" value="{{ p.username }}" class="form-control form-control-sm input-custom fw-bold" style="min-width: 110px;">
                                     </td>
                                     <td>
-                                        <input type="email" name="email" value="{{ p.get('email', '') }}" class="form-control form-control-sm input-dark" style="min-width: 130px;">
+                                        <input type="text" name="email" value="{{ p.get('email', '') }}" class="form-control form-control-sm input-custom" style="min-width: 140px;">
                                     </td>
                                     <td>
                                         <span class="badge bg-warning text-dark fs-6">${{ p.get('money', 0) }}</span>
@@ -216,8 +247,8 @@ HTML_LAYOUT = """
                                     </td>
                                     <td>
                                         <div class="d-flex gap-1">
-                                            <input type="number" name="money_amount" value="0" min="0" class="form-control form-control-sm input-dark" style="width: 80px;" placeholder="المبلغ">
-                                            <select name="money_action" class="form-select form-select-sm input-dark" style="width: 95px;">
+                                            <input type="number" name="money_amount" value="0" min="0" class="form-control form-control-sm input-custom" style="width: 75px;">
+                                            <select name="money_action" class="form-select form-select-sm input-custom" style="width: 85px;">
                                                 <option value="add">➕ إضافة</option>
                                                 <option value="subtract">➖ خصم</option>
                                                 <option value="set">🎯 تعيين</option>
@@ -225,7 +256,7 @@ HTML_LAYOUT = """
                                         </div>
                                     </td>
                                     <td>
-                                        <input type="text" name="admin_message" value="{{ p.get('admin_message', '') }}" placeholder="إرسال رسالة للاعب..." class="form-control form-control-sm input-dark" style="min-width: 130px;">
+                                        <input type="text" name="admin_message" value="{{ p.get('admin_message', '') }}" placeholder="رسالة تنبيه..." class="form-control form-control-sm input-custom" style="min-width: 120px;">
                                     </td>
                                     <td>
                                         <div class="d-flex align-items-center gap-1">
@@ -234,9 +265,9 @@ HTML_LAYOUT = """
                                             {% else %}
                                                 <span class="badge bg-success">نشط</span>
                                             {% endif %}
-                                            <button type="submit" class="btn btn-neon btn-sm" title="حفظ"><i class="fa-solid fa-floppy-disk"></i></button>
+                                            <button type="submit" class="btn btn-accent btn-sm" title="حفظ"><i class="fa-solid fa-floppy-disk"></i></button>
                                             <a href="/admin/toggle_ban/{{ uname }}" class="btn btn-outline-warning btn-sm" title="حظر/فك حظر"><i class="fa-solid fa-ban"></i></a>
-                                            <a href="/admin/delete_player/{{ uname }}" class="btn btn-outline-danger btn-sm" onclick="return confirm('حذف الحساب نهائياً؟')" title="حذف"><i class="fa-solid fa-trash"></i></a>
+                                            <a href="/admin/delete_player/{{ uname }}" class="btn btn-outline-danger btn-sm" onclick="return confirm('حذف الحساب؟')" title="حذف"><i class="fa-solid fa-trash"></i></a>
                                         </div>
                                     </td>
                                 </form>
@@ -250,43 +281,43 @@ HTML_LAYOUT = """
 
         <!-- Sidebar Right -->
         <div class="col-md-3 col-lg-3 sidebar">
-            <!-- Date & Time Widget -->
+            <!-- Clock -->
             <div class="card-custom p-3 mb-4 text-center">
                 <h6 class="text-muted mb-2"><i class="fa-regular fa-calendar-days text-info me-1"></i> التاريخ والوقت</h6>
-                <div id="live-clock" class="fs-5 fw-bold neon-text">--:--:--</div>
-                <small id="live-date" class="text-muted"></small>
+                <div id="live-clock" class="fs-5 fw-bold accent-text">--:--:--</div>
+                <small id="live-date" class="text-muted fw-bold"></small>
             </div>
 
-            <!-- Remote Store Management Widget -->
+            <!-- Add Store Item -->
             <div class="card-custom p-3 mb-4">
-                <h6 class="neon-text mb-3"><i class="fa-solid fa-cart-plus me-1"></i> إضافة عنصر للمتجر عن بُعد</h6>
+                <h6 class="accent-text mb-3"><i class="fa-solid fa-cart-plus me-1"></i> إضافة شيء للمتجر عن بُعد</h6>
                 <form action="/admin/add_store_item" method="POST">
                     <div class="mb-2">
-                        <label class="form-label small text-muted">معرّف العنصر (ID)</label>
-                        <input type="text" name="item_id" placeholder="مثال: M416" class="form-control form-control-sm input-dark" required>
+                        <label class="form-label small text-muted fw-bold">معرّف العنصر (ID)</label>
+                        <input type="text" name="item_id" placeholder="مثال: M416" class="form-control form-control-sm input-custom" required>
                     </div>
                     <div class="mb-2">
-                        <label class="form-label small text-muted">اسم العنصر/السلاح</label>
-                        <input type="text" name="item_name" placeholder="مثال: سلاح M416" class="form-control form-control-sm input-dark" required>
+                        <label class="form-label small text-muted fw-bold">اسم السلاح</label>
+                        <input type="text" name="item_name" placeholder="مثال: سلاح M416" class="form-control form-control-sm input-custom" required>
                     </div>
                     <div class="mb-2">
-                        <label class="form-label small text-muted">السعر ($)</label>
-                        <input type="number" name="price" placeholder="400" class="form-control form-control-sm input-dark" required>
+                        <label class="form-label small text-muted fw-bold">السعر ($)</label>
+                        <input type="number" name="price" placeholder="400" class="form-control form-control-sm input-custom" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label small text-muted">الأيقونة (Emoji)</label>
-                        <input type="text" name="icon" value="🔫" class="form-control form-control-sm input-dark">
+                        <label class="form-label small text-muted fw-bold">الأيقونة</label>
+                        <input type="text" name="icon" value="🔫" class="form-control form-control-sm input-custom">
                     </div>
-                    <button type="submit" class="btn btn-neon w-100 btn-sm"><i class="fa-solid fa-plus"></i> إضافة للمتجر فوراً</button>
+                    <button type="submit" class="btn btn-accent w-100 btn-sm"><i class="fa-solid fa-plus"></i> إضافة للمتجر</button>
                 </form>
             </div>
 
-            <!-- Current Store Items -->
+            <!-- Current Store -->
             <div class="card-custom p-3">
-                <h6 class="text-muted mb-3"><i class="fa-solid fa-store me-1"></i> عناصر المتجر الحالية</h6>
+                <h6 class="text-muted mb-3 fw-bold"><i class="fa-solid fa-store me-1"></i> المتجر الحالي</h6>
                 <ul class="list-group list-group-flush bg-transparent">
                     {% for item in store_items %}
-                    <li class="list-group-item bg-transparent border-bottom border-secondary d-flex justify-content-between align-items-center py-2 text-white">
+                    <li class="list-group-item bg-transparent border-bottom d-flex justify-content-between align-items-center py-2" style="color: var(--text-color);">
                         <span>{{ item.icon }} {{ item.name }}</span>
                         <span class="badge bg-success">${{ item.price }}</span>
                     </li>
@@ -314,6 +345,20 @@ HTML_LAYOUT = """
             row.style.display = text.includes(input) ? '' : 'none';
         });
     }
+
+    function toggleTheme() {
+        const html = document.documentElement;
+        const currentTheme = html.getAttribute('data-bs-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-bs-theme', newTheme);
+        
+        const btn = document.getElementById('theme-btn');
+        if (newTheme === 'light') {
+            btn.innerHTML = '<i class="fa-solid fa-moon me-1"></i> الوضع الداكن';
+        } else {
+            btn.innerHTML = '<i class="fa-solid fa-sun me-1"></i> الوضع الفاتح';
+        }
+    }
 </script>
 </body>
 </html>
@@ -329,17 +374,17 @@ LOGIN_HTML = """
     <style>
         body { background-color: #0b0e14; color: #fff; height: 100vh; display: flex; align-items: center; justify-content: center; }
         .login-card { background: #151c28; border: 1px solid #222d42; border-radius: 16px; padding: 30px; width: 100%; max-width: 380px; }
-        .neon-text { color: #00ffaa; }
+        .accent-text { color: #00ffaa; }
         .input-dark { background: #0b0e14; border: 1px solid #2a374e; color: #fff; }
     </style>
 </head>
 <body>
 <div class="login-card text-center">
-    <h3 class="neon-text mb-4">🔐 دخول لوحة الإدارة</h3>
+    <h3 class="accent-text mb-4">🔐 دخول لوحة الإدارة</h3>
     {% if error %}<div class="alert alert-danger py-2 small">{{ error }}</div>{% endif %}
     <form method="POST">
         <div class="mb-3">
-            <input type="password" name="password" placeholder="كلمة المرور" class="form-control input-dark" required>
+            <input type="password" name="password" placeholder="كلمة المرور" class="form-control input-dark text-center" required>
         </div>
         <button type="submit" class="btn btn-success w-100 fw-bold" style="background: #00ffaa; color: #000; border: none;">دخول</button>
     </form>
@@ -396,7 +441,6 @@ def update_player():
     if orig_uname in db["players"]:
         player = db["players"].pop(orig_uname)
         
-        # حاسبة الفلوس الجديدة
         current_money = player.get("money", 0)
         if money_action == "add":
             player["money"] = current_money + money_amount
