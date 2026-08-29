@@ -21,6 +21,8 @@ def load_data():
     try:
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
+            if "players" not in data:
+                data["players"] = {}
             if "shop" not in data:
                 data["shop"] = [
                     {"id": "AK-47", "name": "AK-47 🔫", "price": 500, "image": ""},
@@ -135,14 +137,14 @@ def buy_item():
     players = db.get("players", {})
     shop = db.get("shop", [])
 
-    # البحث عن اللاعب
-    player = None
-    for p_name, p_data in players.items():
-        if p_name.lower() == username.lower():
-            player = p_data
+    # البحث عن المفتاح الحقيقي للحساب
+    target_key = None
+    for uname in players:
+        if uname.lower() == username.lower():
+            target_key = uname
             break
 
-    if not player:
+    if not target_key:
         return jsonify({"status": "error", "message": "اللاعب غير موجود"}), 404
 
     # البحث عن السلاح في المتجر
@@ -150,30 +152,32 @@ def buy_item():
     if not item:
         return jsonify({"status": "error", "message": "العنصر غير موجود في المتجر"}), 404
 
-    price = item["price"]
+    price = int(item["price"])
+    player = players[target_key]
 
     # التأكد من كفاية الرصيد
-    if player.get("money", 0) < price:
+    current_money = int(player.get("money", 0))
+    if current_money < price:
         return jsonify({"status": "error", "message": "رصيدك غير كافٍ للشراء"}), 400
 
-    # خصم المبلغ وإضافة السلاح للحساب
-    player["money"] -= price
+    # خصم المبلغ وتعديل الرصيد مباشرة في قاموس اللاعبين
+    players[target_key]["money"] = current_money - price
     
-    if "unlocked_weapons" not in player:
-        player["unlocked_weapons"] = ["PISTOL"]
+    if "unlocked_weapons" not in players[target_key]:
+        players[target_key]["unlocked_weapons"] = ["PISTOL"]
         
-    if item_id not in player["unlocked_weapons"]:
-        player["unlocked_weapons"].append(item_id)
+    if item_id not in players[target_key]["unlocked_weapons"]:
+        players[target_key]["unlocked_weapons"].append(item_id)
 
-    # حفظ التعديلات نهائياً
-    db["players"][player["username"]] = player
+    # حفظ الملف نهائياً
+    db["players"] = players
     save_data(db)
 
     return jsonify({
         "status": "success",
         "message": "تم الشراء بنجاح",
-        "new_money": player["money"],
-        "unlocked_weapons": player["unlocked_weapons"]
+        "new_money": players[target_key]["money"],
+        "unlocked_weapons": players[target_key]["unlocked_weapons"]
     }), 200
 
 # ══════════════════════════════════════════════════
@@ -212,7 +216,6 @@ ADMIN_HTML = """
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; transition: background 0.2s, color 0.2s; }
         body { background-color: var(--bg-body); color: var(--text-color); display: flex; min-height: 100vh; padding: 15px; gap: 15px; }
         
-        /* Layout Structure */
         .main-content { flex: 1; display: flex; flex-direction: column; gap: 15px; }
         .sidebar-left { width: 320px; display: flex; flex-direction: column; gap: 15px; }
         .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 15px; }
@@ -235,7 +238,6 @@ ADMIN_HTML = """
         .shop-badge { background: #064e3b; color: #10b981; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
         .btn-del-shop { background: #7f1d1d; color: #fff; border: none; width: 24px; height: 24px; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }
 
-        /* Top Bar */
         .top-bar { display: flex; justify-content: space-between; align-items: center; }
         .main-title { font-size: 22px; font-weight: bold; color: var(--text-color); display: flex; align-items: center; gap: 10px; }
         .main-title span { color: var(--accent-green); }
@@ -243,14 +245,12 @@ ADMIN_HTML = """
         .btn-top { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-color); padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
         .btn-exit { background: #991b1b; color: #fff; border: none; }
         
-        /* Stats */
         .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
         .stat-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 15px; text-align: center; }
         .stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
         .stat-num { font-size: 24px; font-weight: bold; color: var(--accent-green); }
         .stat-num.red { color: #ef4444; }
         
-        /* Search & Table */
         .search-box input { width: 100%; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-color); padding: 10px 15px; border-radius: 8px; font-size: 13px; }
         
         .table-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 15px; flex: 1; overflow-x: auto; }
@@ -267,7 +267,6 @@ ADMIN_HTML = """
         .btn-act { width: 28px; height: 28px; border: none; border-radius: 4px; cursor: pointer; color: white; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }
         .btn-act.status-active { background: #059669; }
         .btn-act.status-banned { background: #dc2626; }
-        .btn-act.ban { background: #b91c1c; }
         .btn-act.delete { background: #7f1d1d; }
         .btn-act.save-pass { background: #2563eb; }
         
@@ -279,7 +278,6 @@ ADMIN_HTML = """
 </head>
 <body>
 
-    <!-- Main Content Right -->
     <div class="main-content">
         <div class="top-bar">
             <div class="main-title"><i class="fas fa-gamepad"></i> لوحة إدارة السيرفر</div>
@@ -289,7 +287,6 @@ ADMIN_HTML = """
             </div>
         </div>
 
-        <!-- Top Stats -->
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-label">إجمالي اللاعبين</div>
@@ -305,12 +302,10 @@ ADMIN_HTML = """
             </div>
         </div>
 
-        <!-- Search -->
         <div class="search-box">
             <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="🔍 ابحث عن لاعب بالاسم أو البريد...">
         </div>
 
-        <!-- Accounts Table -->
         <div class="table-card">
             <div class="table-header"><i class="fas fa-users-cog"></i> قائمة الحسابات والتعديل</div>
             <table id="playersTable">
@@ -368,7 +363,6 @@ ADMIN_HTML = """
         </div>
     </div>
 
-    <!-- Sidebar Left (المتجر على اليسار) -->
     <div class="sidebar-left">
         <div class="card time-box">
             <div class="time-title"><i class="far fa-calendar-alt"></i> التاريخ والوقت</div>
@@ -514,8 +508,14 @@ def admin_update_user():
     db = load_data()
     players = db.get("players", {})
 
-    if target in players:
-        p = players[target]
+    target_key = None
+    for uname in players:
+        if uname.lower() == target.lower():
+            target_key = uname
+            break
+
+    if target_key:
+        p = players[target_key]
         p["admin_message"] = admin_msg
 
         if new_pass:
@@ -530,8 +530,9 @@ def admin_update_user():
         elif action == "unban":
             p["is_banned"] = 0
         elif action == "delete":
-            del players[target]
+            del players[target_key]
 
+        db["players"] = players
         save_data(db)
 
     return redirect(url_for('admin_panel'))
