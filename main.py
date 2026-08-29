@@ -64,6 +64,7 @@ def init_db():
 
 init_db()
 
+# --- الصفحة الرئيسية تشويقية بدون أزرار ---
 @app.route('/')
 def home():
     return '''
@@ -71,17 +72,77 @@ def home():
     <html lang="ar" dir="rtl">
     <head>
         <meta charset="UTF-8">
-        <title>عالم Relic Curse</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Relic Curse - قريباً</title>
         <style>
-            body { background: #0b0c10; color: #fff; font-family: Tahoma, sans-serif; text-align: center; padding: 50px; }
-            h1 { color: #00ffcc; }
-            a { color: #ff00ff; font-size: 20px; text-decoration: none; border: 2px solid #ff00ff; padding: 10px 20px; border-radius: 8px; display: inline-block; margin-top: 20px; }
+            body { 
+                background: radial-gradient(circle, #1a022d 0%, #05010a 100%); 
+                color: #fff; 
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                text-align: center; 
+                padding: 40px 20px; 
+                margin: 0;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+            }
+            .container {
+                border: 2px solid #8a2be2;
+                border-radius: 20px;
+                padding: 40px 30px;
+                background: rgba(15, 5, 29, 0.85);
+                box-shadow: 0 0 35px rgba(138, 43, 226, 0.5);
+                max-width: 650px;
+            }
+            h1 { 
+                color: #00f3ff; 
+                font-size: 38px; 
+                margin-bottom: 10px;
+                text-shadow: 0 0 15px #00f3ff;
+            }
+            .subtitle {
+                color: #e0aaff;
+                font-size: 20px;
+                margin-bottom: 25px;
+                font-weight: 300;
+            }
+            p { 
+                color: #c4b5fd; 
+                font-size: 16px; 
+                line-height: 1.8;
+                margin-bottom: 20px;
+            }
+            .badge {
+                display: inline-block;
+                background: #ff007f;
+                color: #fff;
+                padding: 8px 18px;
+                border-radius: 25px;
+                font-weight: bold;
+                font-size: 14px;
+                box-shadow: 0 0 10px #ff007f;
+                margin-top: 15px;
+            }
+            footer {
+                margin-top: 30px;
+                color: #666;
+                font-size: 12px;
+            }
         </style>
     </head>
     <body>
-        <h1>🎮 خوادم Relic Curse تعمل بكفاءة!</h1>
-        <p>السيرفر متصل وقاعدة البيانات تعمل بنجاح.</p>
-        <a href="/admin">الذهاب إلى لوحة تحكم الإمبراطور 👑</a>
+        <div class="container">
+            <h1>⚔️ RELIC CURSE ⚔️</h1>
+            <div class="subtitle">لعنة الأثر تتجهز للظهور...</div>
+            <p>
+                استعدوا لمغامرة ملحمية وعالم مليء بالتحديات والأسرار! <br>
+                السيرفرات والأنظمة تعمل الآن بنجاح وتحت التجهيز النهائي.
+            </p>
+            <div class="badge">🔥 الإطلاق القريب - stay tuned! 🔥</div>
+        </div>
+        <footer>© Relic Curse Game Studio. جميع الحقوق محفوظة.</footer>
     </body>
     </html>
     '''
@@ -109,6 +170,7 @@ def send_code():
     except Exception as e:
         return jsonify({"status": "error", "message": f"خطأ بالسرفر: {str(e)}"}), 500
 
+# --- لوحة تحكم الأدمن من /admin فقط ---
 @app.route('/admin', methods=['GET', 'POST'])
 def admin_panel():
     if request.method == 'POST':
@@ -354,7 +416,7 @@ def login():
             
             return jsonify({
                 "status": "success",
-                "message": "تم التحديث بنجاح!",
+                "message": "تم الدخول بنجاح!",
                 "username": username,
                 "email": email,
                 "money": money,
