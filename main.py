@@ -172,7 +172,7 @@ def buy_item():
     }), 200
 
 # ══════════════════════════════════════════════════
-# 🖥️ لوحة التحكم الأصلية الاحترافية مع توقيت حي
+# 🖥️ لوحة التحكم المطابقة لصورتك تماماً مع التوقيت الحي
 # ══════════════════════════════════════════════════
 
 ADMIN_HTML = """
@@ -237,7 +237,7 @@ ADMIN_HTML = """
 <body>
 
     <header>
-        <h1>لوحة إدارة السيرفر (EZ9)</h1>
+        <h1>لوحة إدارة السيرفر EZ9</h1>
         <div style="text-align: left;">
             <div id="live-clock" style="font-size: 15px; font-weight: bold; color: var(--success);">جاري تحميل الوقت...</div>
             <div id="live-date" style="font-size: 12px; color: var(--text-muted);"></div>
@@ -246,44 +246,43 @@ ADMIN_HTML = """
 
     <div class="stats-container">
         <div class="stat-card">
-            <h3>إجمالي اللاعبين</h3>
-            <p>{{ players|length }}</p>
+            <h3>إجمالي الأدمن</h3>
+            <p>1</p>
         </div>
         <div class="stat-card">
             <h3>إجمالي أموال اللعبة</h3>
             <p>${{ players|sum(attribute='money') }}</p>
         </div>
         <div class="stat-card">
-            <h3>عدد عناصر المتجر</h3>
-            <p>{{ shop|length }}</p>
+            <h3>العمليات المحظورة</h3>
+            <p>{{ players|selectattr('is_banned', 'equalto', 1)|list|length }}</p>
         </div>
     </div>
 
     <div class="main-layout">
-        <!-- القائمة الجانبية لإضافة الأسلحة وتعديل المتجر -->
+        <!-- القائمة الجانبية للمتجر وإضافته -->
         <div class="sidebar">
             <div class="card">
-                <h2>إضافة سلاح جديد للمتجر</h2>
+                <h2>إضافة عنصر للمتجر الجديد</h2>
                 <form action="/admin/add_shop" method="POST">
-                    <label>معرف السلاح في اللعبة (ID مثل: DESEART EAGLE)</label>
+                    <label>معرف السلاح (ID)</label>
                     <input type="text" name="shop_id" placeholder="DESEART EAGLE" required>
                     
-                    <label>اسم السلاح الظاهر</label>
+                    <label>اسم السلاح</label>
                     <input type="text" name="shop_name" placeholder="نصر صحراء" required>
                     
                     <label>رابط الصورة (URL)</label>
                     <input type="text" name="shop_image" placeholder="https://example.com/gun.png">
                     
                     <label>السعر ($)</label>
-                    <input type="number" name="shop_price" placeholder="350" required>
+                    <input type="number" name="shop_price" placeholder="400" required>
                     
-                    <button type="submit">إضافة للسيرفر</button>
+                    <button type="submit">إضافة المتجر</button>
                 </form>
             </div>
 
-            <!-- قائمة تعديل وحذف عناصر المتجر نهائياً -->
             <div class="card">
-                <h2>عناصر المتجر الحاليّة</h2>
+                <h2>المتجر الحالي</h2>
                 {% for item in shop %}
                 <form action="/admin/edit_shop" method="POST" class="shop-item-box">
                     <input type="hidden" name="old_id" value="{{ item.id }}">
@@ -294,25 +293,26 @@ ADMIN_HTML = """
                         </div>
                         <div style="display: flex; gap: 4px;">
                             <button type="submit" name="action" value="edit" class="btn-action btn-save" title="حفظ التعديل"><i class="fas fa-save"></i></button>
-                            <button type="submit" name="action" value="delete" class="btn-action btn-delete" title="حذف تام من المتجر واللعبة"><i class="fas fa-trash"></i></button>
+                            <button type="submit" name="action" value="delete" class="btn-action btn-delete" title="حذف تام"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>
                     <div class="shop-item-body">
-                        <input type="text" name="new_id" value="{{ item.id }}" placeholder="ID" title="معرف السلاح في اللعبة" required>
-                        <input type="text" name="new_name" value="{{ item.name }}" placeholder="الاسم" title="الاسم الظاهر" required>
-                        <input type="number" name="new_price" value="{{ item.price }}" placeholder="السعر" title="السعر" required>
+                        <input type="text" name="new_id" value="{{ item.id }}" placeholder="ID" required>
+                        <input type="text" name="new_name" value="{{ item.name }}" placeholder="الاسم" required>
+                        <input type="number" name="new_price" value="{{ item.price }}" placeholder="السعر" required>
                     </div>
-                    <input type="text" name="new_image" value="{{ item.image }}" placeholder="رابط الصورة URL" title="رابط الصورة">
+                    <input type="text" name="new_image" value="{{ item.image }}" placeholder="رابط الصورة URL">
                 </form>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- جدول إدارة اللاعبين الكامل -->
+        <!-- الجدول الرئيسي للاعبين -->
         <div class="table-container">
             <h2 style="font-size: 16px; color: var(--success); margin-bottom: 15px;">قائمة الحسابات والتحكم الكامل</h2>
             <table>
                 <tr>
+                    <th>الصورة</th>
                     <th>اسم المستخدم</th>
                     <th>البريد الإلكتروني</th>
                     <th>كلمة السر</th>
@@ -320,12 +320,13 @@ ADMIN_HTML = """
                     <th>تعديل الفلوس</th>
                     <th>رسالة الإدارة</th>
                     <th>حالة الحظر</th>
-                    <th>إجراءات الحفظ والحذف</th>
+                    <th>إجراءات</th>
                 </tr>
                 {% for p in players %}
                 <tr>
                     <form action="/admin/update_user_full" method="POST">
                         <input type="hidden" name="target_username" value="{{ p.username }}">
+                        <td><i class="fas fa-user-circle" style="font-size: 22px; color: var(--text-muted);"></i></td>
                         <td><input type="text" name="new_username" value="{{ p.username }}" required></td>
                         <td><input type="text" name="new_email" value="{{ p.email }}"></td>
                         <td><input type="text" name="new_password" value="{{ p.password }}" required></td>
@@ -333,11 +334,11 @@ ADMIN_HTML = """
                         <td>
                             <div style="display: flex; gap: 4px; align-items: center;">
                                 <button type="submit" name="action" value="add_money" class="btn-action" style="background:var(--success); padding: 5px 8px;">+</button>
-                                <input type="number" name="money_change" value="100" style="width: 60px; text-align: center;">
+                                <input type="number" name="money_change" value="100" style="width: 55px; text-align: center;">
                                 <button type="submit" name="action" value="sub_money" class="btn-action" style="background:var(--danger); padding: 5px 8px;">-</button>
                             </div>
                         </td>
-                        <td><input type="text" name="admin_message" value="{{ p.admin_message }}" placeholder="رسالة عند الحظر..."></td>
+                        <td><input type="text" name="admin_message" value="{{ p.admin_message }}" placeholder="رسالة الحظر..."></td>
                         <td>
                             <select name="is_banned" style="padding: 5px;">
                                 <option value="0" {% if p.is_banned == 0 %}selected{% endif %}>نشط</option>
@@ -345,9 +346,9 @@ ADMIN_HTML = """
                             </select>
                         </td>
                         <td>
-                            <div style="display: flex; gap: 5px; justify-content: center;">
-                                <button type="submit" name="action" value="save_profile" class="btn-action btn-edit" title="حفظ التعديلات"><i class="fas fa-edit"></i></button>
-                                <button type="submit" name="action" value="delete_account" class="btn-action btn-delete" title="حذف الحساب نهائياً"><i class="fas fa-trash"></i></button>
+                            <div style="display: flex; gap: 4px; justify-content: center;">
+                                <button type="submit" name="action" value="save_profile" class="btn-action btn-edit" title="حفظ"><i class="fas fa-edit"></i></button>
+                                <button type="submit" name="action" value="delete_account" class="btn-action btn-delete" title="حذف"><i class="fas fa-trash"></i></button>
                             </div>
                         </td>
                     </form>
@@ -360,9 +361,7 @@ ADMIN_HTML = """
     <script>
         function updateClock() {
             const now = new Date();
-            // عرض الوقت بالساعات الدقائق والثواني
             document.getElementById('live-clock').innerText = now.toLocaleTimeString('ar-EG');
-            // عرض التاريخ اليومي
             const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
             document.getElementById('live-date').innerText = now.toLocaleDateString('ar-EG', options);
         }
