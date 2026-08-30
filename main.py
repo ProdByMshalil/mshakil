@@ -12,12 +12,10 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-# إنشاء الجداول محلياً مع إضافة عناصر افتراضية (نصر صحراء و AK)
 def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
     
-    # جدول اللاعبين
     cur.execute("""
         CREATE TABLE IF NOT EXISTS players (
             username TEXT PRIMARY KEY,
@@ -32,7 +30,6 @@ def init_db():
         );
     """)
     
-    # جدول المتجر
     cur.execute("""
         CREATE TABLE IF NOT EXISTS shop (
             id TEXT PRIMARY KEY,
@@ -42,10 +39,11 @@ def init_db():
         );
     """)
 
-    # إضافة الأسلحة الافتراضية إذا لم تكن موجودة (نصر صحراء و AK-47)
+    # العناصر الافتراضية
     default_items = [
-        ("DESERT_EAGLE", "نصر صحراء", 350, ""),
-        ("AK47", "سلاح AK-47", 750, "")
+        ("AK47", "AK-47", 100, ""),
+        ("DESEART EAGLE", "Desert Eagle", 350, ""),
+        ("UMP", "UMP", 500, "")
     ]
     for item_id, name, price, img in default_items:
         cur.execute("INSERT OR IGNORE INTO shop (id, name, price, image) VALUES (?, ?, ?, ?)", (item_id, name, price, img))
@@ -72,19 +70,15 @@ def register():
 
     conn = get_db_connection()
     cur = conn.cursor()
-
-    cur.execute("SELECT username FROM players WHERE LOWER(username) = LOWER(?) OR (email != '' AND LOWER(email) = LOWER(?))", (username, email))
-    existing = cur.fetchone()
-
-    if existing:
+    cur.execute("SELECT username FROM players WHERE LOWER(username) = LOWER(?)", (username,))
+    if cur.fetchone():
         conn.close()
-        return jsonify({"status": "error", "message": "اسم المستخدم أو البريد مستخدم بالفعل"}), 400
+        return jsonify({"status": "error", "message": "اسم المستخدم مستخدم بالفعل"}), 400
 
     cur.execute("""
         INSERT INTO players (username, password, email, money, score, is_banned, admin_message, unlocked_weapons, avatar)
         VALUES (?, ?, ?, 1000, 0, 0, '', '["PISTOL"]', '')
     """, (username, password, email))
-
     conn.commit()
     cur.close()
     conn.close()
@@ -97,9 +91,6 @@ def login():
     user_input = str(data.get('username', '')).strip().lower()
     password = str(data.get('password', '')).strip()
 
-    if not user_input or not password:
-        return jsonify({"status": "error", "message": "يرجى إدخال اسم المستخدم وكلمة السر"}), 400
-
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("SELECT * FROM players WHERE LOWER(username) = ? OR LOWER(email) = ?", (user_input, user_input))
@@ -107,14 +98,12 @@ def login():
     conn.close()
 
     if not player or str(player['password']).strip() != password:
-        return jsonify({"status": "error", "message": "اسم المستخدم أو كلمة السر غير صحيحة"}), 401
+        return jsonify({"status": "error", "message": "بيانات الدخول غير صحيحة"}), 401
 
     if player['is_banned'] == 1:
-        msg = player['admin_message'] or "تم حظر حسابك من قبل الإدارة"
-        return jsonify({"status": "error", "message": msg, "is_banned": 1}), 403
+        return jsonify({"status": "error", "message": player['admin_message'] or "الحساب محظور", "is_banned": 1}), 403
 
     weapons = json.loads(player['unlocked_weapons'] or '["PISTOL"]')
-
     return jsonify({
         "status": "success",
         "username": player['username'],
@@ -142,25 +131,20 @@ def buy_item():
     username = str(data.get('username', '')).strip()
     item_id = str(data.get('item_id', '')).strip()
 
-    if not username or not item_id:
-        return jsonify({"status": "error", "message": "بيانات غير مكتملة"}), 400
-
     conn = get_db_connection()
     cur = conn.cursor()
 
     cur.execute("SELECT * FROM players WHERE LOWER(username) = LOWER(?)", (username,))
     player = cur.fetchone()
-
     if not player:
         conn.close()
         return jsonify({"status": "error", "message": "اللاعب غير موجود"}), 404
 
     cur.execute("SELECT * FROM shop WHERE id = ?", (item_id,))
     item = cur.fetchone()
-
     if not item:
         conn.close()
-        return jsonify({"status": "error", "message": "العنصر غير موجود في المتجر"}), 404
+        return jsonify({"status": "error", "message": f"العنصر {item_id} غير موجود في المتجر"}), 404
 
     price = item['price']
     current_money = player['money']
@@ -175,12 +159,8 @@ def buy_item():
     if item_id not in weapons:
         weapons.append(item_id)
 
-    cur.execute("""
-        UPDATE players 
-        SET money = ?, unlocked_weapons = ? 
-        WHERE LOWER(username) = LOWER(?)
-    """, (new_money, json.dumps(weapons), username))
-
+    cur.execute("UPDATE players SET money = ?, unlocked_weapons = ? WHERE LOWER(username) = LOWER(?)", 
+                (new_money, json.dumps(weapons), username))
     conn.commit()
     cur.close()
     conn.close()
@@ -193,7 +173,7 @@ def buy_item():
     }), 200
 
 # ══════════════════════════════════════════════════
-# 🖥️ لوحة الأدمن المحدثة
+# 🖥️ لوحة الأدمن المحدثة (تعديل وحذف تام للمتجر)
 # ══════════════════════════════════════════════════
 
 ADMIN_HTML = """
@@ -201,186 +181,87 @@ ADMIN_HTML = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة إدارة السيرفر - EZ9</title>
+    <title>لوحة تحكم السيرفر - EZ9</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        :root { --bg-body: #090c15; --bg-card: #111827; --border-color: #1f2937; --text-color: #e2e8f0; --text-muted: #9ca3af; --bg-input: #0b0f19; --accent-green: #10b981; }
-        body.light-mode { --bg-body: #f1f5f9; --bg-card: #ffffff; --border-color: #cbd5e1; --text-color: #0f172a; --text-muted: #64748b; --bg-input: #f8fafc; --accent-green: #059669; }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; transition: background 0.2s, color 0.2s; }
-        body { background-color: var(--bg-body); color: var(--text-color); display: flex; min-height: 100vh; padding: 15px; gap: 15px; }
-        .main-content { flex: 1; display: flex; flex-direction: column; gap: 15px; }
-        .sidebar-left { width: 320px; display: flex; flex-direction: column; gap: 15px; }
-        .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 15px; }
-        .time-box { text-align: center; border-color: #064e3b; }
-        .time-title { color: var(--accent-green); font-size: 13px; font-weight: bold; margin-bottom: 5px; }
-        .time-val { font-size: 20px; font-weight: bold; color: var(--accent-green); }
-        .date-val { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
-        .form-title { color: var(--accent-green); font-size: 14px; font-weight: bold; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-        .inp-group { margin-bottom: 10px; }
-        .inp-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: block; }
-        .sidebar-left input { width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-color); padding: 8px 10px; border-radius: 6px; font-size: 12px; }
-        .btn-add-shop { width: 100%; background: var(--accent-green); color: #fff; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 5px; }
-        .shop-list-title { font-size: 13px; color: var(--text-muted); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
-        .shop-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg-input); padding: 8px 12px; border-radius: 6px; margin-bottom: 6px; border: 1px solid var(--border-color); }
-        .shop-item-left { display: flex; align-items: center; gap: 8px; }
-        .shop-img { width: 30px; height: 30px; border-radius: 4px; object-fit: cover; background: var(--border-color); }
-        .shop-badge { background: #064e3b; color: #10b981; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-        .btn-del-shop { background: #7f1d1d; color: #fff; border: none; width: 24px; height: 24px; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }
-        .top-bar { display: flex; justify-content: space-between; align-items: center; }
-        .main-title { font-size: 22px; font-weight: bold; color: var(--text-color); display: flex; align-items: center; gap: 10px; }
-        .main-title span { color: var(--accent-green); }
-        .top-btns { display: flex; gap: 8px; }
-        .btn-top { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-color); padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
-        .btn-exit { background: #991b1b; color: #fff; border: none; }
-        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
-        .stat-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 15px; text-align: center; }
-        .stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
-        .stat-num { font-size: 24px; font-weight: bold; color: var(--accent-green); }
-        .stat-num.red { color: #ef4444; }
-        .search-box input { width: 100%; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-color); padding: 10px 15px; border-radius: 8px; font-size: 13px; }
-        .table-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 15px; flex: 1; overflow-x: auto; }
-        .table-header { color: var(--accent-green); font-size: 15px; font-weight: bold; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
-        table { width: 100%; border-collapse: collapse; min-width: 1050px; }
-        th { color: var(--accent-green); font-size: 12px; padding: 10px; text-align: center; border-bottom: 1px solid var(--border-color); }
-        td { padding: 10px; text-align: center; border-bottom: 1px solid var(--border-color); font-size: 13px; }
-        .user-avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; background: var(--border-color); display: inline-flex; align-items: center; justify-content: center; color: var(--accent-green); }
-        .money-badge { background: #fbbf24; color: #000; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block; margin-bottom: 3px; }
-        .weapons-text { font-size: 10px; color: var(--text-muted); display: block; }
-        .actions { display: flex; justify-content: center; gap: 4px; }
-        .btn-act { width: 28px; height: 28px; border: none; border-radius: 4px; cursor: pointer; color: white; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }
-        .btn-act.status-active { background: #059669; }
-        .btn-act.status-banned { background: #dc2626; }
-        .btn-act.delete { background: #7f1d1d; }
-        .btn-act.save-pass { background: #2563eb; }
-        .inp-tbl { background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-color); padding: 4px 6px; border-radius: 4px; text-align: center; font-size: 12px; }
-        .inp-money { width: 45px; }
-        .inp-text { width: 110px; }
+        :root { --bg-body: #090c15; --bg-card: #111827; --border: #1f2937; --text: #e2e8f0; --green: #10b981; }
+        body { background: var(--bg-body); color: var(--text); font-family: Tahoma, sans-serif; display: flex; padding: 15px; gap: 15px; min-height: 100vh; }
+        .main { flex: 1; display: flex; flex-direction: column; gap: 15px; }
+        .side { width: 340px; display: flex; flex-direction: column; gap: 15px; }
+        .box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 15px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px; text-align: center; border-bottom: 1px solid var(--border); font-size: 13px; }
+        th { color: var(--green); }
+        input, button { background: #0b0f19; border: 1px solid var(--border); color: var(--text); padding: 6px; border-radius: 4px; font-size: 12px; }
+        .btn { background: var(--green); color: #fff; border: none; cursor: pointer; font-weight: bold; }
+        .btn-del { background: #7f1d1d; color: #fff; border: none; cursor: pointer; padding: 4px 8px; border-radius: 4px; }
+        .btn-edit { background: #2563eb; color: #fff; border: none; cursor: pointer; padding: 4px 8px; border-radius: 4px; }
+        .shop-row { display: flex; flex-direction: column; background: #0b0f19; padding: 10px; border-radius: 6px; margin-bottom: 8px; border: 1px solid var(--border); gap: 6px; }
+        .shop-row-top { display: flex; justify-content: space-between; align-items: center; }
+        .shop-row-inputs { display: flex; gap: 4px; }
+        .shop-row-inputs input { width: 100%; }
     </style>
 </head>
 <body>
-    <div class="main-content">
-        <div class="top-bar">
-            <div class="main-title"><i class="fas fa-gamepad"></i> لوحة إدارة السيرفر <span>EZ9</span></div>
-            <div class="top-btns">
-                <button class="btn-top" onclick="toggleTheme()"><i class="fas fa-adjust"></i> <span id="theme-text">الوضع الفاتح</span></button>
-                <a href="/admin" class="btn-top btn-exit" onclick="alert('تم تسجيل خروج الأدمن بنجاح');"><i class="fas fa-sign-out-alt"></i> خروج</a>
-            </div>
-        </div>
-        <div class="stats-grid">
-            <div class="stat-card"><div class="stat-label">إجمالي اللاعبين</div><div class="stat-num">{{ total_players }}</div></div>
-            <div class="stat-card"><div class="stat-label">إجمالي أموال اللعبة</div><div class="stat-num">${{ total_money }}</div></div>
-            <div class="stat-card"><div class="stat-label">الحسابات المحظورة</div><div class="stat-num red">{{ banned_count }}</div></div>
-        </div>
-        <div class="search-box">
-            <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="🔍 ابحث عن لاعب بالاسم، البريد، أو تفاصيل السلاح...">
-        </div>
-        <div class="table-card">
-            <div class="table-header"><i class="fas fa-users-cog"></i> قائمة الحسابات والتحكم الشامل</div>
-            <table id="playersTable">
-                <thead>
-                    <tr>
-                        <th>الصورة</th><th>اسم المستخدم</th><th>البريد الإلكتروني</th><th>كلمة السر</th><th>الرصيد الحالي</th><th>تعديل الفلوس</th><th>رسالة الإدارة</th><th>إجراءات</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for p in players %}
-                    <tr>
-                        <form action="/admin/update_user" method="POST">
-                            <input type="hidden" name="target_username" value="{{ p.username }}">
-                            <td>
-                                {% if p.avatar %}
-                                    <img src="{{ p.avatar }}" class="user-avatar" alt="avatar">
-                                {% else %}
-                                    <div class="user-avatar"><i class="fas fa-user"></i></div>
-                                {% endif %}
-                            </td>
-                            <td><input type="text" name="new_username" value="{{ p.username }}" class="inp-tbl inp-text" title="تعديل اسم المستخدم"></td>
-                            <td><input type="text" name="new_email" value="{{ p.email or '' }}" class="inp-tbl inp-text" placeholder="البريد..." title="تعديل البريد"></td>
-                            <td><input type="text" name="new_password" value="{{ p.password }}" class="inp-tbl inp-text" title="تعديل كلمة السر"></td>
-                            <td>
-                                <div class="money-badge">${{ p.money }}</div>
-                                <span class="weapons-text">الأسلحة: {{ p.unlocked_weapons_list | join(', ') }}</span>
-                            </td>
-                            <td>
-                                <button type="submit" name="action" value="add_money" class="btn-act status-active" title="إضافة رصيد">+</button>
-                                <input type="number" name="money_change" value="0" class="inp-tbl inp-money">
-                                <button type="submit" name="action" value="sub_money" class="btn-act status-banned" title="خصم رصيد">-</button>
-                            </td>
-                            <td><input type="text" name="admin_message" value="{{ p.admin_message or '' }}" placeholder="رسالة تنبيه..." class="inp-tbl" style="width: 100px;"></td>
-                            <td>
-                                <div class="actions">
-                                    <button type="submit" name="action" value="save_all" class="btn-act save-pass" title="حفظ جميع التعديلات"><i class="fas fa-save"></i></button>
-                                    {% if p.is_banned %}
-                                        <button type="submit" name="action" value="unban" class="btn-act status-banned" title="فك الحظر">محظور</button>
-                                    {% else %}
-                                        <button type="submit" name="action" value="ban" class="btn-act status-active" title="حظر">نشط</button>
-                                    {% endif %}
-                                    <button type="submit" name="action" value="delete" class="btn-act delete" title="حذف الحساب"><i class="fas fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </form>
-                    </tr>
-                    {% endfor %}
-                </tbody>
+    <div class="main">
+        <h2>لوحة تحكم السيرفر (EZ9)</h2>
+        <div class="box" style="overflow-x:auto;">
+            <h3>اللاعبين المسجلين</h3>
+            <table>
+                <tr><th>اسم المستخدم</th><th>البريد</th><th>الرصيد</th><th>التحكم بالفلوس</th><th>حذف</th></tr>
+                {% for p in players %}
+                <tr>
+                    <form action="/admin/update_user" method="POST">
+                        <input type="hidden" name="target_username" value="{{ p.username }}">
+                        <td>{{ p.username }}</td>
+                        <td>{{ p.email }}</td>
+                        <td>${{ p.money }}</td>
+                        <td>
+                            <button type="submit" name="action" value="add_money" class="btn">+</button>
+                            <input type="number" name="money_change" value="100" style="width:50px; text-align:center;">
+                            <button type="submit" name="action" value="sub_money" class="btn" style="background:#dc2626;">-</button>
+                        </td>
+                        <td><button type="submit" name="action" value="delete" class="btn-del"><i class="fas fa-trash"></i></button></td>
+                    </form>
+                </tr>
+                {% endfor %}
             </table>
         </div>
     </div>
-    <div class="sidebar-left">
-        <div class="card time-box">
-            <div class="time-title"><i class="far fa-calendar-alt"></i> التاريخ والوقت</div>
-            <div class="time-val" id="clock">--:--:--</div>
-            <div class="date-val" id="date">--</div>
-        </div>
-        <div class="card">
-            <div class="form-title"><i class="fas fa-cart-plus"></i> إضافة عنصر للمتجر عن بُعد</div>
-            <form action="/admin/add_shop" method="POST">
-                <div class="inp-group"><label class="inp-label">معرف العنصر (ID)</label><input type="text" name="shop_id" placeholder="مثال: DESERT_EAGLE" required></div>
-                <div class="inp-group"><label class="inp-label">اسم السلاح</label><input type="text" name="shop_name" placeholder="مثال: نصر صحراء" required></div>
-                <div class="inp-group"><label class="inp-label">رابط الصورة (URL)</label><input type="text" name="shop_image" placeholder="https://example.com/gun.png"></div>
-                <div class="inp-group"><label class="inp-label">السعر ($)</label><input type="number" name="shop_price" placeholder="400" required></div>
-                <button type="submit" class="btn-add-shop">+ إضافة للمتجر</button>
+    <div class="side">
+        <div class="box">
+            <h3>إضافة عنصر للمتجر</h3>
+            <form action="/admin/add_shop" method="POST" style="display:flex; flex-direction:column; gap:8px;">
+                <label>معرف السلاح (ID مثل: DESEART EAGLE)</label>
+                <input type="text" name="shop_id" placeholder="DESEART EAGLE" required>
+                <label>اسم السلاح الظاهر</label>
+                <input type="text" name="shop_name" placeholder="نصر صحراء" required>
+                <label>السعر ($)</label>
+                <input type="number" name="shop_price" placeholder="350" required>
+                <button type="submit" class="btn" style="padding:8px;">إضافة للسيرفر</button>
             </form>
         </div>
-        <div class="card" style="flex:1;">
-            <div class="shop-list-title"><span><i class="fas fa-store"></i> المتجر الحالي</span></div>
+        <div class="box" style="flex:1;">
+            <h3>عناصر المتجر (تعديل أو حذف تام)</h3>
             {% for item in shop %}
-            <div class="shop-item">
-                <div class="shop-item-left">
-                    {% if item.image %}<img src="{{ item.image }}" class="shop-img" alt="weapon">{% else %}<div class="shop-img" style="display:flex;align-items:center;justify-content:center;"><i class="fas fa-crosshairs" style="font-size:10px;"></i></div>{% endif %}
-                    <span>{{ item.name }}</span>
+            <form action="/admin/edit_shop" method="POST" class="shop-row">
+                <input type="hidden" name="old_id" value="{{ item.id }}">
+                <div class="shop-row-top">
+                    <span><b>ID:</b> {{ item.id }}</span>
+                    <div style="display:flex; gap:4px;">
+                        <button type="submit" name="action" value="edit" class="btn-edit" title="حفظ التعديل"><i class="fas fa-save"></i></button>
+                        <button type="submit" name="action" value="delete" class="btn-del" title="حذف تام من اللعبة والموقع"><i class="fas fa-trash"></i></button>
+                    </div>
                 </div>
-                <div style="display:flex; align-items:center; gap:6px;">
-                    <span class="shop-badge">${{ item.price }}</span>
-                    <form action="/admin/delete_shop" method="POST" style="margin:0;">
-                        <input type="hidden" name="shop_id" value="{{ item.id }}">
-                        <button type="submit" class="btn-del-shop" title="حذف العنصر"><i class="fas fa-trash"></i></button>
-                    </form>
+                <div class="shop-row-inputs">
+                    <input type="text" name="new_id" value="{{ item.id }}" placeholder="ID" title="تعديل معرف السلاح" required>
+                    <input type="text" name="new_name" value="{{ item.name }}" placeholder="الاسم" title="تعديل اسم السلاح" required>
+                    <input type="number" name="new_price" value="{{ item.price }}" placeholder="السعر" title="تعديل السعر" style="width:70px;" required>
                 </div>
-            </div>
+            </form>
             {% endfor %}
         </div>
     </div>
-    <script>
-        function toggleTheme() { document.body.classList.toggle('light-mode'); document.getElementById('theme-text').textContent = document.body.classList.contains('light-mode') ? 'الوضع الداكن' : 'الوضع الفاتح'; }
-        function updateClock() {
-            const now = new Date();
-            const hours = String(now.getHours() % 12 || 12).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            const ampm = now.getHours() >= 12 ? 'ص' : 'م';
-            document.getElementById('clock').textContent = `${hours}:${minutes}:${seconds} ${ampm}`;
-            document.getElementById('date').textContent = now.toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        }
-        setInterval(updateClock, 1000); updateClock();
-        
-        function filterTable() {
-            const input = document.getElementById('searchInput').value.toLowerCase();
-            document.querySelectorAll('#playersTable tbody tr').forEach(row => { 
-                row.style.display = row.textContent.toLowerCase().includes(input) ? '' : 'none'; 
-            });
-        }
-    </script>
 </body>
 </html>
 """
@@ -390,53 +271,51 @@ def admin_panel():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("SELECT * FROM players")
-    raw_players = cur.fetchall()
-    
-    players = []
-    for p in raw_players:
-        p_dict = dict(p)
-        try:
-            p_dict['unlocked_weapons_list'] = json.loads(p_dict['unlocked_weapons'] or '["PISTOL"]')
-        except:
-            p_dict['unlocked_weapons_list'] = ["PISTOL"]
-        players.append(p_dict)
-
+    players = [dict(row) for row in cur.fetchall()]
     cur.execute("SELECT * FROM shop")
     shop = [dict(row) for row in cur.fetchall()]
     conn.close()
-
-    total_players = len(players)
-    total_money = sum(p['money'] for p in players)
-    banned_count = sum(1 for p in players if p['is_banned'] == 1)
-
-    return render_template_string(ADMIN_HTML, players=players, shop=shop, total_players=total_players, total_money=total_money, banned_count=banned_count)
+    return render_template_string(ADMIN_HTML, players=players, shop=shop)
 
 @app.route('/admin/add_shop', methods=['POST'])
 def add_shop():
-    s_id = request.form.get('shop_id')
-    s_name = request.form.get('shop_name')
+    s_id = request.form.get('shop_id').strip()
+    s_name = request.form.get('shop_name').strip()
     s_price = request.form.get('shop_price')
-    s_image = request.form.get('shop_image', '')
-
     if s_id and s_name and s_price:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("INSERT OR REPLACE INTO shop (id, name, price, image) VALUES (?, ?, ?, ?)",
-                    (s_id, s_name, int(s_price), s_image))
+        cur.execute("INSERT OR REPLACE INTO shop (id, name, price, image) VALUES (?, ?, ?, '')",
+                    (s_id, s_name, int(s_price)))
         conn.commit()
-        cur.close()
         conn.close()
-
     return redirect(url_for('admin_panel'))
 
-@app.route('/admin/delete_shop', methods=['POST'])
-def delete_shop():
-    s_id = request.form.get('shop_id')
+@app.route('/admin/edit_shop', methods=['POST'])
+def edit_shop():
+    old_id = request.form.get('old_id').strip()
+    action = request.form.get('action')
+    
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("DELETE FROM shop WHERE id = ?", (s_id,))
+    
+    if action == "delete":
+        # حذف تام من قاعدة البيانات ومن اللعبة
+        cur.execute("DELETE FROM shop WHERE id = ?", (old_id,))
+    elif action == "edit":
+        new_id = request.form.get('new_id').strip()
+        new_name = request.form.get('new_name').strip()
+        new_price = int(request.form.get('new_price', 0))
+        
+        if old_id != new_id:
+            cur.execute("DELETE FROM shop WHERE id = ?", (old_id,))
+            cur.execute("INSERT OR REPLACE INTO shop (id, name, price, image) VALUES (?, ?, ?, '')",
+                        (new_id, new_name, new_price))
+        else:
+            cur.execute("UPDATE shop SET name = ?, price = ? WHERE id = ?",
+                        (new_name, new_price, old_id))
+            
     conn.commit()
-    cur.close()
     conn.close()
     return redirect(url_for('admin_panel'))
 
@@ -445,43 +324,17 @@ def admin_update_user():
     target = request.form.get('target_username')
     action = request.form.get('action')
     money_change = int(request.form.get('money_change', 0))
-    admin_msg = request.form.get('admin_message', '')
-    
-    new_username = request.form.get('new_username', '').strip()
-    new_email = request.form.get('new_email', '').strip()
-    new_pass = request.form.get('new_password', '').strip()
 
     conn = get_db_connection()
     cur = conn.cursor()
-
-    # تحديث البيانات الأساسية (الاسم، البريد، كلمة السر) عند التعديل أو حفظ الكل
-    if new_username and new_username != target:
-        cur.execute("UPDATE players SET username = ? WHERE LOWER(username) = LOWER(?)", (new_username, target))
-        target = new_username  # تحديث الهدف للعمليات اللاحقة
-
-    if new_email != '':
-        cur.execute("UPDATE players SET email = ? WHERE LOWER(username) = LOWER(?)", (new_email, target))
-
-    if new_pass:
-        cur.execute("UPDATE players SET password = ? WHERE LOWER(username) = LOWER(?)", (new_pass, target))
-
-    cur.execute("UPDATE players SET admin_message = ? WHERE LOWER(username) = LOWER(?)", (admin_msg, target))
-
     if action == "add_money":
         cur.execute("UPDATE players SET money = money + ? WHERE LOWER(username) = LOWER(?)", (money_change, target))
     elif action == "sub_money":
         cur.execute("UPDATE players SET money = MAX(0, money - ?) WHERE LOWER(username) = LOWER(?)", (money_change, target))
-    elif action == "ban":
-        cur.execute("UPDATE players SET is_banned = 1 WHERE LOWER(username) = LOWER(?)", (target,))
-    elif action == "unban":
-        cur.execute("UPDATE players SET is_banned = 0 WHERE LOWER(username) = LOWER(?)", (target,))
     elif action == "delete":
         cur.execute("DELETE FROM players WHERE LOWER(username) = LOWER(?)", (target,))
-
     conn.commit()
-    cur.close()
     conn.close()
-
     return redirect(url_for('admin_panel'))
 
 if __name__ == '__main__':
