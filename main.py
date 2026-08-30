@@ -12,10 +12,12 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-# إنشاء الجداول محلياً
+# إنشاء الجداول محلياً (كل جدول لوحده لتجنب خطأ sqlite3)
 def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
+    
+    # جدول اللاعبين
     cur.execute("""
         CREATE TABLE IF NOT EXISTS players (
             username TEXT PRIMARY KEY,
@@ -27,7 +29,10 @@ def init_db():
             admin_message TEXT DEFAULT '',
             unlocked_weapons TEXT DEFAULT '["PISTOL"]'
         );
-        
+    """)
+    
+    # جدول المتجر
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS shop (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
@@ -35,6 +40,7 @@ def init_db():
             image TEXT DEFAULT ''
         );
     """)
+    
     conn.commit()
     cur.close()
     conn.close()
