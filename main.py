@@ -39,7 +39,6 @@ def init_db():
         );
     """)
 
-    # العناصر الافتراضية مع ضبط الـ ID تماماً حسب لعبتك
     default_items = [
         ("AK47", "AK-47", 100, "https://i.imgur.com/7k1287B.png"),
         ("DESEART EAGLE", "Desert Eagle", 350, "https://i.imgur.com/384384Q.png"),
@@ -173,7 +172,7 @@ def buy_item():
     }), 200
 
 # ══════════════════════════════════════════════════
-# 🖥️ لوحة التحكم الأصلية الاحترافية (مُحدثة بالكامل)
+# 🖥️ لوحة التحكم الأصلية الاحترافية مع توقيت حي
 # ══════════════════════════════════════════════════
 
 ADMIN_HTML = """
@@ -239,7 +238,10 @@ ADMIN_HTML = """
 
     <header>
         <h1>لوحة إدارة السيرفر (EZ9)</h1>
-        <div id="live-clock" style="font-size: 14px; color: var(--text-muted);"></div>
+        <div style="text-align: left;">
+            <div id="live-clock" style="font-size: 15px; font-weight: bold; color: var(--success);">جاري تحميل الوقت...</div>
+            <div id="live-date" style="font-size: 12px; color: var(--text-muted);"></div>
+        </div>
     </header>
 
     <div class="stats-container">
@@ -306,7 +308,7 @@ ADMIN_HTML = """
             </div>
         </div>
 
-        <!-- جدول إدارة اللاعبين الكامل (تعديل الاسم، الإيميل، الباسورد، الفلوس، الحظر، الرسائل) -->
+        <!-- جدول إدارة اللاعبين الكامل -->
         <div class="table-container">
             <h2 style="font-size: 16px; color: var(--success); margin-bottom: 15px;">قائمة الحسابات والتحكم الكامل</h2>
             <table>
@@ -356,10 +358,16 @@ ADMIN_HTML = """
     </div>
 
     <script>
-        setInterval(() => {
+        function updateClock() {
             const now = new Date();
+            // عرض الوقت بالساعات الدقائق والثواني
             document.getElementById('live-clock').innerText = now.toLocaleTimeString('ar-EG');
-        }, 1000);
+            // عرض التاريخ اليومي
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('live-date').innerText = now.toLocaleDateString('ar-EG', options);
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
     </script>
 </body>
 </html>
@@ -400,7 +408,6 @@ def edit_shop():
     cur = conn.cursor()
     
     if action == "delete":
-        # حذف تام من المتجر ومن قاعدة البيانات
         cur.execute("DELETE FROM shop WHERE id = ?", (old_id,))
     elif action == "edit":
         new_id = request.form.get('new_id').strip()
