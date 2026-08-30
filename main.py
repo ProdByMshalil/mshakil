@@ -1,40 +1,37 @@
 import os
 import json
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import sqlite3
 from flask import Flask, request, jsonify, render_template_string, redirect, url_for
 
 app = Flask(__name__)
 
-# جلب رابط قاعدة البيانات من إعدادات البيئة
-DATABASE_URL = os.environ.get("DATABASE_URL")
+DB_FILE = "database.db"
 
 def get_db_connection():
-    if not DATABASE_URL:
-        raise Exception("DATABASE_URL غير معرف في إعدادات البيئة!")
-    conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
     return conn
 
-# إنشاء الجداول تلقائياً في Supabase إذا لم تكن موجودة
+# إنشاء الجداول محلياً
 def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("""
         CREATE TABLE IF NOT EXISTS players (
-            username VARCHAR(50) PRIMARY KEY,
-            password VARCHAR(100) NOT NULL,
-            email VARCHAR(100),
-            money INT DEFAULT 1000,
-            score INT DEFAULT 0,
-            is_banned INT DEFAULT 0,
+            username TEXT PRIMARY KEY,
+            password TEXT NOT NULL,
+            email TEXT,
+            money INTEGER DEFAULT 1000,
+            score INTEGER DEFAULT 0,
+            is_banned INTEGER DEFAULT 0,
             admin_message TEXT DEFAULT '',
-            unlocked_weapons JSONB DEFAULT '["PISTOL"]'::jsonb
+            unlocked_weapons TEXT DEFAULT '["PISTOL"]'
         );
         
         CREATE TABLE IF NOT EXISTS shop (
-            id VARCHAR(50) PRIMARY KEY,
-            name VARCHAR(100) NOT NULL,
-            price INT NOT NULL,
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            price INTEGER NOT NULL,
             image TEXT DEFAULT ''
         );
     """)
@@ -42,10 +39,7 @@ def init_db():
     cur.close()
     conn.close()
 
-try:
-    init_db()
-except Exception as e:
-    print("DB Init Error:", e)
+init_db()
 
 # ══════════════════════════════════════════════════
 # ⚡ الـ APIs الخاصة بـ Godot
@@ -64,8 +58,7 @@ def register():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # التحقق من وجود الاسم أو البريد
-    cur.execute("SELECT username, email FROM players WHERE LOWER(username) = LOWER(%s) OR (email != '' AND LOWER(email) = LOWER(%s))", (username, email))
+    cur.execute("SELECT username FROM players WHERE LOWER(username) = LOWER(?) OR (email != '' AND LOWER(email) = LOWER(?))", (username, email))
     existing = cur.fetchone()
 
     if existing:
@@ -74,7 +67,7 @@ def register():
 
     cur.execute("""
         INSERT INTO players (username, password, email, money, score, is_banned, admin_message, unlocked_weapons)
-        VALUES (%s, %s, %s, 1000, 0, 0, '', '["PISTOL"]'::jsonb)
+        VALUES (?, ?, ?, 1000, 0, 0, '', '["PISTOL"]')
     """, (username, password, email))
 
     conn.commit()
@@ -94,7 +87,7 @@ def login():
 
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM players WHERE LOWER(username) = %s OR LOWER(email) = %s", (user_input, user_input))
+    cur.execute("SELECT * FROM players WHERE LOWER(username) = ? OR LOWER(email) = ?", (user_input, user_input))
     player = cur.fetchone()
     conn.close()
 
@@ -105,9 +98,7 @@ def login():
         msg = player['admin_message'] or "تم حظر حسابك من قبل الإدارة"
         return jsonify({"status": "error", "message": msg, "is_banned": 1}), 403
 
-    weapons = player['unlocked_weapons']
-    if isinstance(weapons, str):
-        weapons = json.loads(weapons)
+    weapons = json.loads(player['unlocked_weapons'] or '["PISTOL"]')
 
     return jsonify({
         "status": "success",
@@ -125,7 +116,7 @@ def get_shop():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("SELECT * FROM shop")
-    items = cur.fetchall()
+    items = [dict(row) for row in cur.fetchall()]
     conn.close()
     return jsonify({"status": "success", "shop": items}), 200
 
@@ -142,14 +133,14 @@ def buy_item():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    cur.execute("SELECT * FROM players WHERE LOWER(username) = LOWER(%s)", (username,))
+    cur.execute("SELECT * FROM players WHERE LOWER(username) = LOWER(?)", (username,))
     player = cur.fetchone()
 
     if not player:
         conn.close()
         return jsonify({"status": "error", "message": "اللاعب غير موجود"}), 404
 
-    cur.execute("SELECT * FROM shop WHERE id = %s", (item_id,))
+    cur.execute("SELECT * FROM shop WHERE id = ?", (item_id,))
     item = cur.fetchone()
 
     if not item:
@@ -164,17 +155,15 @@ def buy_item():
         return jsonify({"status": "error", "message": "رصيدك غير كافٍ"}), 400
 
     new_money = current_money - price
-    weapons = player['unlocked_weapons'] or ["PISTOL"]
-    if isinstance(weapons, str):
-        weapons = json.loads(weapons)
+    weapons = json.loads(player['unlocked_weapons'] or '["PISTOL"]')
 
     if item_id not in weapons:
         weapons.append(item_id)
 
     cur.execute("""
         UPDATE players 
-        SET money = %s, unlocked_weapons = %s 
-        WHERE LOWER(username) = LOWER(%s)
+        SET money = ?, unlocked_weapons = ? 
+        WHERE LOWER(username) = LOWER(?)
     """, (new_money, json.dumps(weapons), username))
 
     conn.commit()
@@ -291,7 +280,7 @@ ADMIN_HTML = """
                             <td><input type="text" name="new_password" value="{{ p.password }}" class="inp-tbl inp-pass"></td>
                             <td>
                                 <div class="money-badge">${{ p.money }}</div>
-                                <span class="weapons-text">الأسلحة: {{ (p.unlocked_weapons or []) | join(',') }}</span>
+                                <span class="weapons-text">الأسلحة: {{ p.unlocked_weapons_list | join(',') }}</span>
                             </td>
                             <td>
                                 <button type="submit" name="action" value="add_money" class="btn-act status-active">+</button>
@@ -378,9 +367,19 @@ def admin_panel():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("SELECT * FROM players")
-    players = cur.fetchall()
+    raw_players = cur.fetchall()
+    
+    players = []
+    for p in raw_players:
+        p_dict = dict(p)
+        try:
+            p_dict['unlocked_weapons_list'] = json.loads(p_dict['unlocked_weapons'] or '["PISTOL"]')
+        except:
+            p_dict['unlocked_weapons_list'] = ["PISTOL"]
+        players.append(p_dict)
+
     cur.execute("SELECT * FROM shop")
-    shop = cur.fetchall()
+    shop = [dict(row) for row in cur.fetchall()]
     conn.close()
 
     total_players = len(players)
@@ -399,8 +398,8 @@ def add_shop():
     if s_id and s_name and s_price:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("INSERT INTO shop (id, name, price, image) VALUES (%s, %s, %s, %s) ON CONFLICT (id) DO UPDATE SET name=%s, price=%s, image=%s",
-                    (s_id, s_name, int(s_price), s_image, s_name, int(s_price), s_image))
+        cur.execute("INSERT OR REPLACE INTO shop (id, name, price, image) VALUES (?, ?, ?, ?)",
+                    (s_id, s_name, int(s_price), s_image))
         conn.commit()
         cur.close()
         conn.close()
@@ -412,7 +411,7 @@ def delete_shop():
     s_id = request.form.get('shop_id')
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("DELETE FROM shop WHERE id = %s", (s_id,))
+    cur.execute("DELETE FROM shop WHERE id = ?", (s_id,))
     conn.commit()
     cur.close()
     conn.close()
@@ -430,20 +429,20 @@ def admin_update_user():
     cur = conn.cursor()
 
     if new_pass:
-        cur.execute("UPDATE players SET password = %s WHERE LOWER(username) = LOWER(%s)", (new_pass, target))
+        cur.execute("UPDATE players SET password = ? WHERE LOWER(username) = LOWER(?)", (new_pass, target))
 
-    cur.execute("UPDATE players SET admin_message = %s WHERE LOWER(username) = LOWER(%s)", (admin_msg, target))
+    cur.execute("UPDATE players SET admin_message = ? WHERE LOWER(username) = LOWER(?)", (admin_msg, target))
 
     if action == "add_money":
-        cur.execute("UPDATE players SET money = money + %s WHERE LOWER(username) = LOWER(%s)", (money_change, target))
+        cur.execute("UPDATE players SET money = money + ? WHERE LOWER(username) = LOWER(?)", (money_change, target))
     elif action == "sub_money":
-        cur.execute("UPDATE players SET money = GREATEST(0, money - %s) WHERE LOWER(username) = LOWER(%s)", (money_change, target))
+        cur.execute("UPDATE players SET money = MAX(0, money - ?) WHERE LOWER(username) = LOWER(?)", (money_change, target))
     elif action == "ban":
-        cur.execute("UPDATE players SET is_banned = 1 WHERE LOWER(username) = LOWER(%s)", (target,))
+        cur.execute("UPDATE players SET is_banned = 1 WHERE LOWER(username) = LOWER(?)", (target,))
     elif action == "unban":
-        cur.execute("UPDATE players SET is_banned = 0 WHERE LOWER(username) = LOWER(%s)", (target,))
+        cur.execute("UPDATE players SET is_banned = 0 WHERE LOWER(username) = LOWER(?)", (target,))
     elif action == "delete":
-        cur.execute("DELETE FROM players WHERE LOWER(username) = LOWER(%s)", (target,))
+        cur.execute("DELETE FROM players WHERE LOWER(username) = LOWER(?)", (target,))
 
     conn.commit()
     cur.close()
