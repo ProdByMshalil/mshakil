@@ -40,9 +40,8 @@ def init_db():
     """)
 
     default_items = [
-        ("AK47", "AK-47", 100, "https://i.imgur.com/7k1287B.png"),
-        ("DESEART EAGLE", "Desert Eagle", 350, "https://i.imgur.com/384384Q.png"),
-        ("UMP", "UMP", 500, "https://i.imgur.com/5656565.png")
+        ("AK47", "AK47", 30000, "https://i.imgur.com/7k1287B.png"),
+        ("DESERT_EAGLE", "نصر صحراء", 30000, "https://i.imgur.com/384384Q.png")
     ]
     for item_id, name, price, img in default_items:
         cur.execute("INSERT OR IGNORE INTO shop (id, name, price, image) VALUES (?, ?, ?, ?)", (item_id, name, price, img))
@@ -54,7 +53,7 @@ def init_db():
 init_db()
 
 # ══════════════════════════════════════════════════
-# ⚡ الـ APIs الخاصة بـ Godot
+# ⚡ الـ APIs الخاصة بالربط مع لعبة Godot
 # ══════════════════════════════════════════════════
 
 @app.route('/register', methods=['POST'])
@@ -172,7 +171,7 @@ def buy_item():
     }), 200
 
 # ══════════════════════════════════════════════════
-# 🖥️ لوحة التحكم المطابقة لصورتك تماماً مع التوقيت الحي
+# 🖥️ لوحة التحكم بالتصميم الأسطوري الأصلي 100%
 # ══════════════════════════════════════════════════
 
 ADMIN_HTML = """
@@ -182,180 +181,255 @@ ADMIN_HTML = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>لوحة إدارة السيرفر - EZ9</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
-            --bg-main: #090c15;
-            --bg-card: #111827;
-            --bg-input: #1f2937;
-            --border: #374151;
-            --text-main: #f3f4f6;
-            --text-muted: #9ca3af;
-            --primary: #3b82f6;
-            --success: #10b981;
-            --danger: #ef4444;
-            --warning: #f59e0b;
+            --bg-color: #0b111a;
+            --card-bg: #111a28;
+            --input-bg: #0b1018;
+            --border-color: #1e2d42;
+            --text-color: #d1d5db;
+            --accent-green: #00d285;
+            --btn-red: #d9534f;
+            --btn-blue: #0275d8;
+            --gold: #f59e0b;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Tahoma, sans-serif; }
-        body { background-color: var(--bg-main); color: var(--text-main); display: flex; flex-direction: column; min-height: 100vh; padding: 15px; }
-        header { display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); border: 1px solid var(--border); padding: 15px 25px; border-radius: 10px; margin-bottom: 20px; }
-        header h1 { font-size: 20px; color: var(--success); }
-        .stats-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .stat-card { background: var(--bg-card); border: 1px solid var(--border); padding: 15px; border-radius: 10px; text-align: center; }
-        .stat-card h3 { font-size: 14px; color: var(--text-muted); margin-bottom: 5px; }
-        .stat-card p { font-size: 22px; font-weight: bold; color: var(--primary); }
-        
-        .main-layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; }
-        @media(max-width: 900px) { .main-layout { grid-template-columns: 1fr; } }
 
-        .sidebar { display: flex; flex-direction: column; gap: 20px; }
-        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 15px; }
-        .card h2 { font-size: 16px; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; color: var(--success); }
-        
-        form { display: flex; flex-direction: column; gap: 10px; }
-        label { font-size: 12px; color: var(--text-muted); }
-        input, select { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-main); padding: 8px; border-radius: 6px; font-size: 13px; width: 100%; }
-        button { background: var(--success); color: white; border: none; padding: 9px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        button:hover { opacity: 0.9; }
+        .light-theme {
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --input-bg: #e5e7eb;
+            --border-color: #d1d5db;
+            --text-color: #1f2937;
+            --accent-green: #059669;
+        }
 
-        .table-container { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 15px; overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; min-width: 800px; }
-        th, td { padding: 12px; text-align: center; border-bottom: 1px solid var(--border); font-size: 13px; }
-        th { color: var(--success); background: rgba(16, 185, 129, 0.05); }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); padding: 12px; transition: 0.3s; }
+
+        /* Top Header Layout */
+        .top-header { display: flex; justify-content: space-between; align-items: stretch; gap: 15px; margin-bottom: 12px; }
         
-        .btn-action { padding: 5px 10px; border-radius: 4px; border: none; cursor: pointer; color: white; font-size: 12px; }
-        .btn-edit { background: var(--primary); }
-        .btn-delete { background: var(--danger); }
-        .btn-save { background: var(--success); }
+        .header-left { display: flex; align-items: center; gap: 10px; }
+        .time-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 15px; min-width: 150px; }
+        .time-card-title { font-size: 11px; color: var(--accent-green); display: flex; align-items: center; gap: 5px; }
+        .time-clock { font-size: 16px; font-weight: bold; color: var(--accent-green); margin-top: 2px; }
+        .time-date { font-size: 10px; color: #888; }
+
+        .btn-top { border: none; padding: 8px 14px; border-radius: 5px; font-size: 12px; font-weight: bold; cursor: pointer; color: white; display: flex; align-items: center; gap: 6px; }
+        .btn-logout { background: #d9383a; }
+        .btn-mode { background: #233146; color: #fff; }
+
+        .header-right h1 { font-size: 22px; color: var(--accent-green); font-weight: bold; display: flex; align-items: center; gap: 8px; }
+
+        /* Stats Section */
+        .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
+        .stat-box { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; text-align: center; }
+        .stat-box .title { font-size: 12px; color: #88a; margin-bottom: 4px; }
+        .stat-box .value { font-size: 20px; font-weight: bold; }
+
+        /* Main Container */
+        .main-container { display: grid; grid-template-columns: 280px 1fr; gap: 12px; }
+        @media(max-width: 900px) { .main-container { grid-template-columns: 1fr; } }
+
+        /* Sidebar Styles */
+        .sidebar-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; margin-bottom: 12px; }
+        .sidebar-card h3 { font-size: 13px; color: var(--accent-green); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
         
-        .shop-item-box { display: flex; flex-direction: column; background: var(--bg-input); border: 1px solid var(--border); padding: 10px; border-radius: 8px; margin-bottom: 10px; gap: 8px; }
-        .shop-item-header { display: flex; justify-content: space-between; align-items: center; }
-        .shop-item-body { display: grid; grid-template-columns: 1fr 1fr 70px; gap: 5px; }
-        .shop-img-preview { width: 35px; height: 35px; border-radius: 4px; object-fit: cover; background: #000; }
+        form label { font-size: 11px; color: #aaa; display: block; margin-top: 6px; margin-bottom: 2px; }
+        input[type="text"], input[type="number"] { width: 100%; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-color); padding: 7px 10px; border-radius: 4px; font-size: 12px; }
+        
+        .btn-add-store { width: 100%; background: var(--accent-green); color: #000; border: none; padding: 8px; border-radius: 4px; font-weight: bold; margin-top: 10px; cursor: pointer; font-size: 12px; }
+        
+        /* Store Items List */
+        .shop-list-item { display: flex; align-items: center; justify-content: space-between; background: var(--input-bg); border: 1px solid var(--border-color); padding: 6px 10px; border-radius: 5px; margin-bottom: 6px; }
+        .shop-item-info { display: flex; align-items: center; gap: 8px; }
+        .shop-item-badge { background: var(--accent-green); color: #000; font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 3px; }
+        .shop-item-img { width: 28px; height: 28px; object-fit: contain; }
+
+        /* Main Content Area */
+        .search-box { margin-bottom: 10px; position: relative; }
+        .search-box input { padding-right: 30px; }
+        .search-box i { position: absolute; right: 10px; top: 10px; color: #666; font-size: 12px; }
+
+        .table-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; }
+        .table-card h3 { font-size: 13px; color: var(--accent-green); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+
+        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 12px; }
+        th { color: var(--accent-green); padding: 8px; font-weight: normal; border-bottom: 1px solid var(--border-color); }
+        td { padding: 8px; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
+
+        .user-avatar { width: 26px; height: 26px; background: #1c2b3e; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--accent-green); }
+        .balance-badge { background: var(--gold); color: #000; font-weight: bold; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+        .weapons-subtext { font-size: 10px; color: #778; margin-top: 3px; display: block; }
+
+        .btn-icon { border: none; width: 26px; height: 26px; border-radius: 4px; color: white; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }
+        .btn-danger { background: var(--btn-red); }
+        .btn-success { background: var(--accent-green); color: #000; }
+        .btn-primary { background: var(--btn-blue); }
+
+        .money-control { display: flex; align-items: center; justify-content: center; gap: 4px; }
+        .money-control input { width: 45px; text-align: center; padding: 4px; }
+        .money-btn { border: none; width: 20px; height: 20px; border-radius: 3px; font-weight: bold; cursor: pointer; color: white; }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>لوحة إدارة السيرفر EZ9</h1>
-        <div style="text-align: left;">
-            <div id="live-clock" style="font-size: 15px; font-weight: bold; color: var(--success);">جاري تحميل الوقت...</div>
-            <div id="live-date" style="font-size: 12px; color: var(--text-muted);"></div>
+    <!-- Upper Control Bar -->
+    <div class="top-header">
+        <div class="header-left">
+            <div class="time-card">
+                <div class="time-card-title"><i class="far fa-calendar-alt"></i> التاريخ والوقت</div>
+                <div class="time-clock" id="live-clock">03:37:18 ص</div>
+                <div class="time-date" id="live-date">الأحد، ٣٠ أغسطس ٢٠٢٦</div>
+            </div>
+            <button class="btn-top btn-logout"><i class="fas fa-sign-out-alt"></i> خروج</button>
+            <button class="btn-top btn-mode" onclick="toggleTheme()"><i class="fas fa-moon"></i> الوضع الفاتح</button>
         </div>
-    </header>
-
-    <div class="stats-container">
-        <div class="stat-card">
-            <h3>إجمالي الأدمن</h3>
-            <p>1</p>
-        </div>
-        <div class="stat-card">
-            <h3>إجمالي أموال اللعبة</h3>
-            <p>${{ players|sum(attribute='money') }}</p>
-        </div>
-        <div class="stat-card">
-            <h3>العمليات المحظورة</h3>
-            <p>{{ players|selectattr('is_banned', 'equalto', 1)|list|length }}</p>
+        <div class="header-right">
+            <h1><i class="fas fa-gamepad"></i> لوحة إدارة السيرفر EZ9</h1>
         </div>
     </div>
 
-    <div class="main-layout">
-        <!-- القائمة الجانبية للمتجر وإضافته -->
-        <div class="sidebar">
-            <div class="card">
-                <h2>إضافة عنصر للمتجر الجديد</h2>
+    <!-- Stats Bar -->
+    <div class="stats-row">
+        <div class="stat-box">
+            <div class="title">إجمالي اللاعبين</div>
+            <div class="value" style="color: var(--accent-green);">{{ players|length }}</div>
+        </div>
+        <div class="stat-box">
+            <div class="title">إجمالي أموال اللعبة</div>
+            <div class="value" style="color: var(--accent-green);">${{ players|sum(attribute='money') }}</div>
+        </div>
+        <div class="stat-box">
+            <div class="title">الحسابات المحظورة</div>
+            <div class="value" style="color: var(--btn-red);">{{ players|selectattr('is_banned', 'equalto', 1)|list|length }}</div>
+        </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="main-container">
+        
+        <!-- Left Sidebar -->
+        <div>
+            <!-- Add Item Box -->
+            <div class="sidebar-card">
+                <h3><i class="fas fa-shopping-cart"></i> إضافة عنصر للمتجر عن بعد</h3>
                 <form action="/admin/add_shop" method="POST">
-                    <label>معرف السلاح (ID)</label>
-                    <input type="text" name="shop_id" placeholder="DESEART EAGLE" required>
-                    
+                    <label>معرف العنصر (ID)</label>
+                    <input type="text" name="shop_id" placeholder="مثال: DESERT_EAGLE" required>
+
                     <label>اسم السلاح</label>
-                    <input type="text" name="shop_name" placeholder="نصر صحراء" required>
-                    
+                    <input type="text" name="shop_name" placeholder="مثال: نصر صحراء" required>
+
                     <label>رابط الصورة (URL)</label>
-                    <input type="text" name="shop_image" placeholder="https://example.com/gun.png">
-                    
+                    <input type="text" name="shop_image" value="https://example.com/gun.png">
+
                     <label>السعر ($)</label>
-                    <input type="number" name="shop_price" placeholder="400" required>
-                    
-                    <button type="submit">إضافة المتجر</button>
+                    <input type="number" name="shop_price" value="400" required>
+
+                    <button type="submit" class="btn-add-store">+ إضافة للمتجر</button>
                 </form>
             </div>
 
-            <div class="card">
-                <h2>المتجر الحالي</h2>
+            <!-- Current Store Box -->
+            <div class="sidebar-card">
+                <h3><i class="fas fa-store"></i> المتجر الحالي</h3>
                 {% for item in shop %}
-                <form action="/admin/edit_shop" method="POST" class="shop-item-box">
-                    <input type="hidden" name="old_id" value="{{ item.id }}">
-                    <div class="shop-item-header">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <img src="{{ item.image if item.image else 'https://via.placeholder.com/35' }}" class="shop-img-preview" onerror="this.src='https://via.placeholder.com/35'">
-                            <b style="font-size: 12px; color: var(--warning);">ID: {{ item.id }}</b>
-                        </div>
-                        <div style="display: flex; gap: 4px;">
-                            <button type="submit" name="action" value="edit" class="btn-action btn-save" title="حفظ التعديل"><i class="fas fa-save"></i></button>
-                            <button type="submit" name="action" value="delete" class="btn-action btn-delete" title="حذف تام"><i class="fas fa-trash"></i></button>
-                        </div>
+                <div class="shop-list-item">
+                    <form action="/admin/delete_shop" method="POST" style="margin:0;">
+                        <input type="hidden" name="shop_id" value="{{ item.id }}">
+                        <button type="submit" class="btn-icon btn-danger" title="حذف العنصر"><i class="fas fa-trash"></i></button>
+                    </form>
+                    <div class="shop-item-info">
+                        <span class="shop-item-badge">${{ item.price }}</span>
+                        <span style="font-size: 12px; font-weight: bold;">{{ item.name }}</span>
+                        {% if item.image %}
+                        <img src="{{ item.image }}" class="shop-item-img" onerror="this.style.display='none'">
+                        {% endif %}
                     </div>
-                    <div class="shop-item-body">
-                        <input type="text" name="new_id" value="{{ item.id }}" placeholder="ID" required>
-                        <input type="text" name="new_name" value="{{ item.name }}" placeholder="الاسم" required>
-                        <input type="number" name="new_price" value="{{ item.price }}" placeholder="السعر" required>
-                    </div>
-                    <input type="text" name="new_image" value="{{ item.image }}" placeholder="رابط الصورة URL">
-                </form>
+                </div>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- الجدول الرئيسي للاعبين -->
-        <div class="table-container">
-            <h2 style="font-size: 16px; color: var(--success); margin-bottom: 15px;">قائمة الحسابات والتحكم الكامل</h2>
-            <table>
-                <tr>
-                    <th>الصورة</th>
-                    <th>اسم المستخدم</th>
-                    <th>البريد الإلكتروني</th>
-                    <th>كلمة السر</th>
-                    <th>الرصيد الحالي</th>
-                    <th>تعديل الفلوس</th>
-                    <th>رسالة الإدارة</th>
-                    <th>حالة الحظر</th>
-                    <th>إجراءات</th>
-                </tr>
-                {% for p in players %}
-                <tr>
-                    <form action="/admin/update_user_full" method="POST">
-                        <input type="hidden" name="target_username" value="{{ p.username }}">
-                        <td><i class="fas fa-user-circle" style="font-size: 22px; color: var(--text-muted);"></i></td>
-                        <td><input type="text" name="new_username" value="{{ p.username }}" required></td>
-                        <td><input type="text" name="new_email" value="{{ p.email }}"></td>
-                        <td><input type="text" name="new_password" value="{{ p.password }}" required></td>
-                        <td><b style="color: var(--success);">${{ p.money }}</b></td>
-                        <td>
-                            <div style="display: flex; gap: 4px; align-items: center;">
-                                <button type="submit" name="action" value="add_money" class="btn-action" style="background:var(--success); padding: 5px 8px;">+</button>
-                                <input type="number" name="money_change" value="100" style="width: 55px; text-align: center;">
-                                <button type="submit" name="action" value="sub_money" class="btn-action" style="background:var(--danger); padding: 5px 8px;">-</button>
-                            </div>
-                        </td>
-                        <td><input type="text" name="admin_message" value="{{ p.admin_message }}" placeholder="رسالة الحظر..."></td>
-                        <td>
-                            <select name="is_banned" style="padding: 5px;">
-                                <option value="0" {% if p.is_banned == 0 %}selected{% endif %}>نشط</option>
-                                <option value="1" {% if p.is_banned == 1 %}selected{% endif %}>محظور</option>
-                            </select>
-                        </td>
-                        <td>
-                            <div style="display: flex; gap: 4px; justify-content: center;">
-                                <button type="submit" name="action" value="save_profile" class="btn-action btn-edit" title="حفظ"><i class="fas fa-edit"></i></button>
-                                <button type="submit" name="action" value="delete_account" class="btn-action btn-delete" title="حذف"><i class="fas fa-trash"></i></button>
-                            </div>
-                        </td>
-                    </form>
-                </tr>
-                {% endfor %}
-            </table>
+        <!-- Right Main Table Area -->
+        <div>
+            <!-- Search Input -->
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="search-input" onkeyup="filterUsers()" placeholder="ابحث عن لاعب بالاسم، البريد، أو تفاصيل السلاح...">
+            </div>
+
+            <!-- Table Card -->
+            <div class="table-card">
+                <h3><i class="fas fa-users"></i> قائمة الحسابات والتحكم الشامل</h3>
+                <table id="users-table">
+                    <thead>
+                        <tr>
+                            <th>الصورة</th>
+                            <th>اسم المستخدم</th>
+                            <th>البريد الإلكتروني</th>
+                            <th>كلمة السر</th>
+                            <th>الرصيد الحالي</th>
+                            <th>تعديل الفلوس</th>
+                            <th>رسالة الإدارة</th>
+                            <th>إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in players %}
+                        <tr class="user-row">
+                            <form action="/admin/update_user_full" method="POST">
+                                <input type="hidden" name="target_username" value="{{ p.username }}">
+                                
+                                <td>
+                                    <div class="user-avatar"><i class="fas fa-user"></i></div>
+                                </td>
+                                <td>
+                                    <input type="text" name="new_username" value="{{ p.username }}" style="width: 80px; text-align: center;">
+                                </td>
+                                <td>
+                                    <input type="text" name="new_email" value="{{ p.email or '0' }}" style="width: 70px; text-align: center;">
+                                </td>
+                                <td>
+                                    <input type="text" name="new_password" value="{{ p.password }}" style="width: 60px; text-align: center;">
+                                </td>
+                                <td>
+                                    <div class="balance-badge">${{ p.money }}</div>
+                                    <span class="weapons-subtext">الأسلحة: {{ p.unlocked_weapons|replace('"', '')|replace('[', '')|replace(']', '') }}</span>
+                                </td>
+                                <td>
+                                    <div class="money-control">
+                                        <button type="submit" name="action" value="sub_money" class="money-btn" style="background:#d9383a;">-</button>
+                                        <input type="number" name="money_change" value="0">
+                                        <button type="submit" name="action" value="add_money" class="money-btn" style="background:var(--accent-green); color:#000;">+</button>
+                                    </div>
+                                </td>
+                                <td>
+                                    <input type="text" name="admin_message" value="{{ p.admin_message }}" placeholder="رسالة تنبيه..." style="width: 90px;">
+                                </td>
+                                <td>
+                                    <div style="display: flex; gap: 4px; justify-content: center;">
+                                        <button type="submit" name="action" value="delete_account" class="btn-icon btn-danger" title="حذف الحساب"><i class="fas fa-trash"></i></button>
+                                        
+                                        {% if p.is_banned == 1 %}
+                                        <button type="submit" name="action" value="unban" class="btn-icon btn-primary" title="فك الحظر"><i class="fas fa-unlock"></i></button>
+                                        {% else %}
+                                        <button type="submit" name="action" value="save_and_ban" class="btn-icon btn-primary" title="حظر وتعديل"><i class="fas fa-lock"></i></button>
+                                        {% endif %}
+                                        
+                                        <button type="submit" name="action" value="save_profile" class="btn-icon btn-success" title="حفظ"><i class="fas fa-check"></i></button>
+                                    </div>
+                                </td>
+                            </form>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
+
     </div>
 
     <script>
@@ -367,6 +441,21 @@ ADMIN_HTML = """
         }
         setInterval(updateClock, 1000);
         updateClock();
+
+        function filterUsers() {
+            let input = document.getElementById('search-input').value.toLowerCase();
+            let rows = document.querySelectorAll('.user-row');
+            rows.forEach(row => {
+                let text = row.innerText.toLowerCase();
+                let inputs = row.querySelectorAll('input');
+                inputs.forEach(i => text += ' ' + i.value.toLowerCase());
+                row.style.display = text.includes(input) ? '' : 'none';
+            });
+        }
+
+        function toggleTheme() {
+            document.body.classList.toggle('light-theme');
+        }
     </script>
 </body>
 </html>
@@ -398,32 +487,15 @@ def add_shop():
         conn.close()
     return redirect(url_for('admin_panel'))
 
-@app.route('/admin/edit_shop', methods=['POST'])
-def edit_shop():
-    old_id = request.form.get('old_id').strip()
-    action = request.form.get('action')
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    if action == "delete":
-        cur.execute("DELETE FROM shop WHERE id = ?", (old_id,))
-    elif action == "edit":
-        new_id = request.form.get('new_id').strip()
-        new_name = request.form.get('new_name').strip()
-        new_price = int(request.form.get('new_price', 0))
-        new_image = request.form.get('new_image', '').strip()
-        
-        if old_id != new_id:
-            cur.execute("DELETE FROM shop WHERE id = ?", (old_id,))
-            cur.execute("INSERT OR REPLACE INTO shop (id, name, price, image) VALUES (?, ?, ?, ?)",
-                        (new_id, new_name, new_price, new_image))
-        else:
-            cur.execute("UPDATE shop SET name = ?, price = ?, image = ? WHERE id = ?",
-                        (new_name, new_price, new_image, old_id))
-            
-    conn.commit()
-    conn.close()
+@app.route('/admin/delete_shop', methods=['POST'])
+def delete_shop():
+    s_id = request.form.get('shop_id').strip()
+    if s_id:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM shop WHERE id = ?", (s_id,))
+        conn.commit()
+        conn.close()
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/update_user_full', methods=['POST'])
@@ -442,18 +514,26 @@ def admin_update_user_full():
         cur.execute("UPDATE players SET money = MAX(0, money - ?) WHERE LOWER(username) = LOWER(?)", (money_change, target))
     elif action == "delete_account":
         cur.execute("DELETE FROM players WHERE LOWER(username) = LOWER(?)", (target,))
-    elif action == "save_profile":
+    elif action in ["save_profile", "save_and_ban", "unban"]:
         new_username = request.form.get('new_username').strip()
         new_email = request.form.get('new_email').strip()
         new_password = request.form.get('new_password').strip()
         admin_message = request.form.get('admin_message', '').strip()
-        is_banned = int(request.form.get('is_banned', 0))
+        
+        is_banned = 1 if action == "save_and_ban" else (0 if action == "unban" else None)
 
-        cur.execute("""
-            UPDATE players 
-            SET username = ?, email = ?, password = ?, admin_message = ?, is_banned = ? 
-            WHERE LOWER(username) = LOWER(?)
-        """, (new_username, new_email, new_password, admin_message, is_banned, target))
+        if is_banned is not None:
+            cur.execute("""
+                UPDATE players 
+                SET username = ?, email = ?, password = ?, admin_message = ?, is_banned = ? 
+                WHERE LOWER(username) = LOWER(?)
+            """, (new_username, new_email, new_password, admin_message, is_banned, target))
+        else:
+            cur.execute("""
+                UPDATE players 
+                SET username = ?, email = ?, password = ?, admin_message = ? 
+                WHERE LOWER(username) = LOWER(?)
+            """, (new_username, new_email, new_password, admin_message, target))
 
     conn.commit()
     conn.close()
